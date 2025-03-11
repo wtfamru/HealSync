@@ -72,4 +72,8 @@ A decentralized organ donation system that ensures transparency, security, and f
 - **Truffle OR Hardhat** *(TBD ⏳)* – Smart contract testing & deployment  
 - **ESLint + Prettier** – Code formatting & linting  
 - **Husky + Lint-staged** – Git hooks & code quality  
-
+---
+## 📦 **Installing Dependencies**  
+To install all required dependencies, simply run:  
+```sh
+node install-dependencies.js
