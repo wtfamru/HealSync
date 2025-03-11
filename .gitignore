@@ -1,0 +1,52 @@
+# 🚀 General Ignored Files
+.DS_Store
+Thumbs.db
+
+# ⚙️ Node.js Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# 🏗️ Build Artifacts
+dist/
+.next/
+.out/
+.cache/
+coverage/
+*.log
+*.local
+*.lock
+
+# 🌎 Environment Variables
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+# 🛠️ IDE & Editor Configurations
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# 🔗 Blockchain & Web3
+*.json 
+*.sol 
+blockchain/artifacts/
+blockchain/cache/
+blockchain/abis/
+blockchain/deployments/
+truffle-config.js
+hardhat.config.js
+
+# 📦 Miscellaneous
+debug.log
+npm-debug.log*
+yarn-debug.log*
