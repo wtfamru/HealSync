@@ -95,12 +95,13 @@ export default function AuthPage() {
     setIsLoading(true);
 
     try {
-      await login(loginEmail, loginPassword);
+      const role = await login(loginEmail, loginPassword);
       toast.success('Login Successful');
-      // Immediate redirection based on user role
-      if (userRole === "donor") {
+      
+      // Use the role returned directly from the login function
+      if (role === "donor") {
         router.push("/donor-dashboard");
-      } else if (userRole === "hospital") {
+      } else if (role === "hospital") {
         router.push("/hospital-dashboard");
       }
     } catch (error: any) {

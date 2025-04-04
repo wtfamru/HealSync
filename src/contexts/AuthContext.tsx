@@ -26,7 +26,7 @@ interface AuthContextType {
   userData: UserData | null;
   userRole: UserRole;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<UserRole>;
   register: (email: string, password: string, role: UserRole, userData: Partial<UserData>) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -70,7 +70,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string) => {
     const { user } = await signInWithEmailAndPassword(auth, email, password);
     const userDoc = await getDoc(doc(db, "users", user.uid));
-    setUserRole(userDoc.data()?.role || null);
+    const role = userDoc.data()?.role || null;
+    setUserRole(role);
+    return role;
   };
 
   const logout = async () => {
