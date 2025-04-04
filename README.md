@@ -79,7 +79,7 @@ HealSync is a decentralized platform connecting organ donors with recipients, bu
 
 1. Clone the repository
 ```bash
-git clone https://github.com/yourusername/healsync.git
+git clone https://github.com/wtfamru/healsync.git
 ```
 
 2. Install dependencies
