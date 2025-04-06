@@ -19,6 +19,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Switch } from "@/components/ui/switch"
 import { toast } from 'sonner'
 import { Card, CardContent } from "@/components/ui/card"
+import { DatePickerField } from "@/components/ui/date-picker-field"
 
 const formSchema = z.object({
   gender: z.enum(["male", "female", "other"], {
@@ -224,31 +225,17 @@ export default function DonorRegistrationForm() {
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel className="text-gray-600">Date of Birth</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant={"outline"}
-                            className={cn(
-                              "w-full pl-3 text-left font-normal border-gray-400",
-                              !field.value && "text-muted-foreground",
-                            )}
-                          >
-                            {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          disabled={(date: Date) => date > new Date() || date < new Date("1900-01-01")}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
+                    <FormControl>
+                      <DatePickerField
+                        value={field.value}
+                        onChange={field.onChange}
+                        minDate={new Date("1900-01-01")}
+                        maxDate={new Date()}
+                        placeholder="Pick a date"
+                        error={!!form.formState.errors.dob}
+                        className="w-full"
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

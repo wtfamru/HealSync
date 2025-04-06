@@ -16,19 +16,13 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "HealSync | Organ Donation Platform",
-    description: "Connect with organ donors and recipients. Make a difference by registering as an organ donor.",
+    description: "Connect with organ donors and recipients. Make a difference by registering as an donor.",
   },
   robots: {
     index: true,
     follow: true,
-  },
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 1,
-  },
-  themeColor: "#5AA7A7",
-}
+  }
+};
 
 export default function Page() {
   return <OrganDonationLanding />
