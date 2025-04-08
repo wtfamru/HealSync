@@ -69,129 +69,131 @@ export default function RegisterDonor() {
   }, [fileUrl]);
 
   return (
-    <Card>
-      <CardHeader>
+    <Card className="w-full max-w-4xl mx-auto">
+      <CardHeader className="pb-4">
         <CardTitle>Register New Donor</CardTitle>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label htmlFor="name">Name</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                required
-              />
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <Label htmlFor="name">Name</Label>
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="age">Age</Label>
+                <Input
+                  id="age"
+                  type="number"
+                  min="0"
+                  value={formData.age}
+                  onChange={(e) => setFormData({ ...formData, age: e.target.value })}
+                  required
+                  className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="bloodGroup">Blood Group</Label>
+                <Select
+                  value={formData.bloodGroup}
+                  onValueChange={(value) => setFormData({ ...formData, bloodGroup: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select blood group" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {bloodGroups.map((group) => (
+                      <SelectItem key={group} value={group}>
+                        {group}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="age">Age</Label>
-              <Input
-                id="age"
-                type="number"
-                min="0"
-                value={formData.age}
-                onChange={(e) => setFormData({ ...formData, age: e.target.value })}
-                required
-                className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-              />
-            </div>
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <Label htmlFor="organ">Organ</Label>
+                <Select
+                  value={formData.organ}
+                  onValueChange={(value) => setFormData({ ...formData, organ: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select organ" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {organs.map((organ) => (
+                      <SelectItem key={organ} value={organ}>
+                        {organ}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="bloodGroup">Blood Group</Label>
-              <Select
-                value={formData.bloodGroup}
-                onValueChange={(value) => setFormData({ ...formData, bloodGroup: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select blood group" />
-                </SelectTrigger>
-                <SelectContent>
-                  {bloodGroups.map((group) => (
-                    <SelectItem key={group} value={group}>
-                      {group}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+              <div className="space-y-1">
+                <Label htmlFor="tissueType">Tissue Type</Label>
+                <Input
+                  id="tissueType"
+                  value={formData.tissueType}
+                  onChange={(e) => setFormData({ ...formData, tissueType: e.target.value })}
+                  required
+                />
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="organ">Organ</Label>
-              <Select
-                value={formData.organ}
-                onValueChange={(value) => setFormData({ ...formData, organ: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select organ" />
-                </SelectTrigger>
-                <SelectContent>
-                  {organs.map((organ) => (
-                    <SelectItem key={organ} value={organ}>
-                      {organ}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="tissueType">Tissue Type</Label>
-              <Input
-                id="tissueType"
-                value={formData.tissueType}
-                onChange={(e) => setFormData({ ...formData, tissueType: e.target.value })}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="hlaMatch">HLA Match</Label>
-              <Input
-                id="hlaMatch"
-                value={formData.hlaMatch}
-                onChange={(e) => setFormData({ ...formData, hlaMatch: e.target.value })}
-                required
-              />
+              <div className="space-y-1">
+                <Label htmlFor="hlaMatch">HLA Match</Label>
+                <Input
+                  id="hlaMatch"
+                  value={formData.hlaMatch}
+                  onChange={(e) => setFormData({ ...formData, hlaMatch: e.target.value })}
+                  required
+                />
+              </div>
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-1 pt-2">
             <Label htmlFor="file">Medical Report (PDF/Image)</Label>
-            <div className="flex items-center gap-2">
-              <div className="flex-1 flex items-center gap-2 relative">
-                <Input
-                  id="file"
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  onChange={handleFileChange}
-                  required
-                  className="cursor-pointer"
-                />
-                {formData.file && (
-                  <div className="absolute right-2 flex items-center gap-2">
-                    <Eye
-                      className="w-5 h-5 text-gray-500 hover:text-gray-700 cursor-pointer transition-colors"
-                      onClick={openFileInNewTab}
-                    />
-                    <Trash2
-                      className="w-5 h-5 text-gray-500 hover:text-red-600 cursor-pointer transition-colors"
-                      onClick={handleRemoveFile}
-                    />
-                  </div>
-                )}
-              </div>
+            <div className="flex-1 flex items-center gap-2 relative">
+              <Input
+                id="file"
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png"
+                onChange={handleFileChange}
+                required
+                className="cursor-pointer"
+              />
+              {formData.file && (
+                <div className="absolute right-2 flex items-center gap-2">
+                  <Eye
+                    className="w-5 h-5 text-gray-500 hover:text-gray-700 cursor-pointer transition-colors"
+                    onClick={openFileInNewTab}
+                  />
+                  <Trash2
+                    className="w-5 h-5 text-gray-500 hover:text-red-600 cursor-pointer transition-colors"
+                    onClick={handleRemoveFile}
+                  />
+                </div>
+              )}
             </div>
             {formData.file && (
-              <div className="text-sm text-gray-500">
-                Selected file: {formData.file.name} ({(formData.file.size / 1024).toFixed(2)} KB)
+              <div className="text-xs text-gray-500 mt-1">
+                Selected: {formData.file.name} ({(formData.file.size / 1024).toFixed(2)} KB)
               </div>
             )}
           </div>
 
-          <Button type="submit" className="w-full bg-[#5AA7A7] hover:bg-[#4A9696]">
+          <Button type="submit" className="w-full bg-[#5AA7A7] hover:bg-[#4A9696] mt-4">
             Register Donor
           </Button>
         </form>
