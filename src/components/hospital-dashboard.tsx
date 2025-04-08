@@ -16,6 +16,9 @@ import {
   User,
   BarChart3,
   Heart,
+  Search,
+  Clock,
+  HeartPulse,
 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
@@ -34,9 +37,15 @@ import {
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 import { useAuth } from "@/contexts/AuthContext"
 import { useRouter } from "next/navigation"
+import RegisterDonor from "./RegisterDonor"
+import RegisterPatient from "./RegisterPatient"
+import ViewDonors from "./ViewDonors"
+import ViewPatients from "./ViewPatients"
+import MatchDonors from "./MatchDonors"
+import TransplantRecords from "./TransplantRecords"
 
 export default function Dashboard() {
-  const [activeLink, setActiveLink] = useState("dashboard")
+  const [activeTab, setActiveTab] = useState("dashboard")
   const { user, userData, logout } = useAuth()
   const router = useRouter()
 
@@ -93,145 +102,11 @@ export default function Dashboard() {
     },
   ]
 
-  return (
-    <SidebarProvider>
-      <div className="flex h-screen bg-gray-50">
-        {/* Sidebar */}
-        <Sidebar className="border-r border-gray-200">
-          <SidebarHeader className="border-b border-gray-200 py-4">
-            <div className="flex items-center px-4 gap-2">
-              <Heart className="h-6 w-6 text-primary" />
-              <h1 className="text-xl font-bold text-[#6C8CBF] hover:text-[#5AA7A7] transition-colors select-none">
-                HealSync
-              </h1>
-            </div>
-          </SidebarHeader>
-
-          <SidebarContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton isActive={activeLink === "dashboard"} onClick={() => setActiveLink("dashboard")} className="cursor-pointer">
-                  <BarChart3 className="h-5 w-5" />
-                  <span>Dashboard</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  isActive={activeLink === "register-donors"}
-                  onClick={() => setActiveLink("register-donors")}
-                  className="cursor-pointer"
-                >
-                  <UserPlus className="h-5 w-5" />
-                  <span>Register Donors</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  isActive={activeLink === "register-patients"}
-                  onClick={() => setActiveLink("register-patients")}
-                  className="cursor-pointer"
-                >
-                  <UserPlus className="h-5 w-5" />
-                  <span>Register Patients</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton isActive={activeLink === "donor-list"} onClick={() => setActiveLink("donor-list")} className="cursor-pointer">
-                  <Users className="h-5 w-5" />
-                  <span>Donor List</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  isActive={activeLink === "waiting-list"}
-                  onClick={() => setActiveLink("waiting-list")}
-                  className="cursor-pointer"
-                >
-                  <ListChecks className="h-5 w-5" />
-                  <span>Waiting List</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  isActive={activeLink === "non-verified-donors"}
-                  onClick={() => setActiveLink("non-verified-donors")}
-                  className="cursor-pointer"
-                >
-                  <ClipboardList className="h-5 w-5" />
-                  <span>Non-Verified Donor List</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  isActive={activeLink === "transplant-match"}
-                  onClick={() => setActiveLink("transplant-match")}
-                  className="cursor-pointer"
-                >
-                  <FileCheck className="h-5 w-5" />
-                  <span>Transplant Match</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  isActive={activeLink === "transplant-records"}
-                  onClick={() => setActiveLink("transplant-records")}
-                  className="cursor-pointer"
-                >
-                  <History className="h-5 w-5" />
-                  <span>View Transplant Records</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarContent>
-
-          <SidebarFooter>
-            <Button className="w-full mb-4 bg-[#5AA7A7] hover:bg-[#4A9696] text-white cursor-pointer" size="sm">
-              <Wallet className="mr-2 h-4 w-4" />
-              Connect Wallet
-            </Button>
-
-            <SidebarSeparator />
-
-            <div className="pt-4">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="w-full justify-start px-2 cursor-pointer">
-                    <User className="mr-2 h-4 w-4 text-gray-500" />
-                    <span className="text-gray-600">
-                      {userData?.hospitalName || "Hospital Name"}
-                    </span>
-                    <ChevronDown className="ml-auto h-4 w-4 text-gray-500" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuItem className="cursor-pointer">
-                    <User className="mr-2 h-4 w-4" />
-                    <span>Profile</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Logout</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </SidebarFooter>
-        </Sidebar>
-
-        {/* Main Content */}
-        <div className="flex-1 overflow-auto">
-          <header className="bg-white border-b border-gray-200 px-6 py-4">
-            <h1 className="text-2xl font-bold text-[#6C8CBF] select-none">Hospital Dashboard</h1>
-          </header>
-
-          <main className="p-6">
+  const renderContent = () => {
+    switch (activeTab) {
+      case "dashboard":
+        return (
+          <>
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               <Card className="bg-gradient-to-br from-[#96D7C6]/10 to-white border-[#5AA7A7]/20">
@@ -424,6 +299,170 @@ export default function Dashboard() {
                 </ul>
               </CardContent>
             </Card>
+          </>
+        )
+      case "register-donor":
+        return <RegisterDonor />
+      case "register-patient":
+        return <RegisterPatient />
+      case "donor-list":
+        return <ViewDonors />
+      case "waiting-list":
+        return <ViewPatients />
+      case "transplant-match":
+        return <MatchDonors />
+      case "transplant-records":
+        return <TransplantRecords />
+      default:
+        return null
+    }
+  }
+
+  return (
+    <SidebarProvider>
+      <div className="flex h-screen bg-gray-50">
+        {/* Sidebar */}
+        <Sidebar className="border-r border-gray-200">
+          <SidebarHeader className="border-b border-gray-200 py-4">
+            <div className="flex items-center px-4 gap-2">
+              <Heart className="h-6 w-6 text-primary" />
+              <h1 className="text-xl font-bold text-[#6C8CBF] hover:text-[#5AA7A7] transition-colors select-none">
+                HealSync
+              </h1>
+            </div>
+          </SidebarHeader>
+
+          <SidebarContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={activeTab === "dashboard"}
+                  onClick={() => setActiveTab("dashboard")}
+                  className="cursor-pointer hover:bg-gradient-to-r from-[#6C8CBF]/10 to-[#5AA7A7]/10 rounded-2xl"
+                >
+                  <BarChart3 className="h-5 w-5" />
+                  <span>Dashboard</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={activeTab === "register-donor"}
+                  onClick={() => setActiveTab("register-donor")}
+                  className="cursor-pointer hover:bg-gradient-to-r from-[#6C8CBF]/10 to-[#5AA7A7]/10 rounded-2xl"
+                >
+                  <UserPlus className="h-5 w-5" />
+                  <span>Register Donor</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={activeTab === "register-patient"}
+                  onClick={() => setActiveTab("register-patient")}
+                  className="cursor-pointer hover:bg-gradient-to-r from-[#6C8CBF]/10 to-[#5AA7A7]/10 rounded-2xl"
+                >
+                  <UserCheck className="h-5 w-5" />
+                  <span>Register Patient</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={activeTab === "donor-list"}
+                  onClick={() => setActiveTab("donor-list")}
+                  className="cursor-pointer hover:bg-gradient-to-r from-[#6C8CBF]/10 to-[#5AA7A7]/10 rounded-2xl"
+                >
+                  <Search className="h-5 w-5" />
+                  <span>Donor List</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={activeTab === "waiting-list"}
+                  onClick={() => setActiveTab("waiting-list")}
+                  className="cursor-pointer hover:bg-gradient-to-r from-[#6C8CBF]/10 to-[#5AA7A7]/10 rounded-2xl"
+                >
+                  <Clock className="h-5 w-5" />
+                  <span>Waiting List</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={activeTab === "transplant-match"}
+                  onClick={() => setActiveTab("transplant-match")}
+                  className="cursor-pointer hover:bg-gradient-to-r from-[#6C8CBF]/10 to-[#5AA7A7]/10 rounded-2xl"
+                >
+                  <HeartPulse className="h-5 w-5" />
+                  <span>Transplant Match</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={activeTab === "transplant-records"}
+                  onClick={() => setActiveTab("transplant-records")}
+                  className="cursor-pointer hover:bg-gradient-to-r from-[#6C8CBF]/10 to-[#5AA7A7]/10 rounded-2xl"
+                >
+                  <History className="h-5 w-5" />
+                  <span>Transplant Records</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarContent>
+
+          <SidebarFooter>
+            <Button className="w-full mb-4 bg-[#5AA7A7] hover:bg-[#4A9696] text-white cursor-pointer" size="sm">
+              <Wallet className="mr-2 h-4 w-4" />
+              Connect Wallet
+            </Button>
+
+            <SidebarSeparator />
+
+            <div className="pt-4">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="w-full justify-start px-2 cursor-pointer">
+                    <User className="mr-2 h-4 w-4 text-gray-500" />
+                    <span className="text-gray-600">
+                      {userData?.hospitalName || "Hospital Name"}
+                    </span>
+                    <ChevronDown className="ml-auto h-4 w-4 text-gray-500" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem className="cursor-pointer">
+                    <User className="mr-2 h-4 w-4" />
+                    <span>Profile</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Logout</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </SidebarFooter>
+        </Sidebar>
+
+        {/* Main Content */}
+        <div className="flex-1 overflow-auto">
+          <header className="bg-white border-b border-gray-200 px-6 py-4">
+            <h1 className="text-2xl font-bold text-[#6C8CBF] select-none">
+              {activeTab === "dashboard" && "Hospital Dashboard"}
+              {activeTab === "register-donor" && "Register Donor"}
+              {activeTab === "register-patient" && "Register Patient"}
+              {activeTab === "donor-list" && "Donor List"}
+              {activeTab === "waiting-list" && "Waiting List"}
+              {activeTab === "transplant-match" && "Transplant Match"}
+              {activeTab === "transplant-records" && "Transplant Records"}
+            </h1>
+          </header>
+
+          <main className="p-6">
+            {renderContent()}
           </main>
         </div>
       </div>
