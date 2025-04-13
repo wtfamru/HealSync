@@ -1,79 +1,140 @@
-# HealSync - Organ Donation Platform
+# HealSync - Decentralized Organ Donation Platform
 
-HealSync is a decentralized platform connecting organ donors with recipients, built with Next.js and Web3 technologies.
+HealSync is a hybrid platform connecting organ donors with recipients, combining the security of blockchain technology with the reliability of Firebase. Built with Next.js, Firebase, and ThirdWeb for smart contract deployment.
 
 ## 🚀 Features Implemented
 
-### Frontend
-- Modern, responsive UI with Tailwind CSS
-- User authentication system
-- Donor registration form with validation
-- Hospital dashboard
-- Landing page with key information
-- Form validation using Zod
-- Toast notifications for user feedback
-- Consistent branding and styling
+### Authentication & Data Management (Firebase)
+- Complete authentication system with Firebase Auth
+- Secure data storage with Firestore
+- Role-based access (Donors, Hospitals)
+- Protected routes and authenticated sessions
+- User profile management
+- Real-time data updates
+- Structured data models
 
-### Components
-- Reusable UI components using shadcn/ui
-- Custom form components
-- Responsive layouts
-- Interactive buttons and form elements
-- Date picker for DOB selection
-- Radio groups for gender selection
-- Select dropdowns for blood group and ID type
+### Donor Features
+- Comprehensive donor registration form with:
+  - Personal details (Name, DOB, Gender)
+  - Contact information
+  - Blood group selection
+  - Multiple organ donation preferences
+  - ID verification
+  - Hospital selection
+- Pledge submission system
+- Status tracking
+- Hospital assignment
 
-### Styling
-- Brand colors implemented (#5AA7A7, #6C8CBF)
-- Consistent hover effects
-- Responsive design for all screen sizes
-- Modern gradient backgrounds
-- Interactive elements with proper cursor states
+### Hospital Dashboard
+- Complete hospital management interface with:
+  - Statistical overview and analytics
+  - Donor registration system
+  - Patient registration
+  - Organ verification workflow
+  - Transplant matching
+  - Donor status management
+  - PDF report upload/verification
+  - Searchable donor and pledge lists
+
+### Advanced Features
+- Real-time donor status updates
+- PDF report management for organ verification
+- Advanced search and filtering
+  - Donor search
+  - Pledge filtering
+  - Organ availability tracking
+- Detailed view dialogs for pledge information
+- Status tracking (Active/Deceased/Verified)
+- Multi-step verification process
+
+### Prepared for Blockchain Integration
+- Smart contract architecture designed
+- Wallet connection UI components ready
+- ThirdWeb SDK integration prepared
+- Blockchain event listeners structured
+- Transaction handling system designed
 
 ## 🛠️ Tech Stack
 
+### Core Stack
 - **Frontend Framework**: Next.js 14
 - **Styling**: Tailwind CSS
 - **UI Components**: shadcn/ui
 - **Form Handling**: React Hook Form with Zod validation
 - **Authentication**: Firebase Auth
+- **Database**: Firebase Firestore
 - **State Management**: React Context
 - **Notifications**: Sonner
 - **Icons**: Lucide React
 
+### Blockchain Stack
+- **Blockchain**: Ethereum (Sepolia Testnet)
+- **Web3 Development**: ThirdWeb
+- **Smart Contract Language**: Solidity
+- **Wallet Integration**: ThirdWeb Connect
+
 ## 📝 Next Steps
 
-### Smart Contract Development
-1. Deploy smart contract to Sepolia Mumbai testnet using ThirdWeb
-   - Set up ThirdWeb SDK
-   - Create and test smart contract
-   - Deploy to testnet
-   - Verify contract on Etherscan
+### Immediate Priority: Blockchain Integration
+1. Deploy prepared smart contracts using ThirdWeb
+   - Donor Registration Contract
+   - Patient Registration Contract
+   - Organ Matching Contract
+   - Hospital Verification Contract
+   - Transaction Management Contract
 
-### Web3 Integration
-1. Connect frontend with smart contract
-   - Implement Web3 provider
-   - Add wallet connection
-   - Create contract interaction functions
-   - Handle transaction states
+2. Integrate blockchain features with Firebase
+   - Connect donor registration with smart contracts
+   - Implement decentralized organ matching
+   - Store verification status on blockchain
+   - Create transparent donation tracking
+   - Enable smart contract-based hospital verification
 
-2. Add blockchain features
-   - Donor registration on-chain
-   - Organ donation preferences storage
-   - Transaction history
-   - Event listeners for updates
+3. Add Web3 specific features
+   - Wallet connection and management
+   - Gas fee estimation and handling
+   - Transaction confirmation flows
+   - Block confirmation tracking
+   - Event subscription and real-time updates
 
-### Testing
-1. Unit tests for smart contract
-2. Integration tests for Web3 features
-3. End-to-end testing of the complete flow
-4. Security audits
+### Smart Contract Features to Implement
+1. Donor Management
+   - On-chain donor registration
+   - Organ availability tracking
+   - Status updates (Active/Deceased)
+   - Donation history
 
-### Documentation
-1. API documentation
-2. Smart contract documentation
-3. Deployment guide
-4. User guide
+2. Patient Management
+   - On-chain patient registration
+   - Organ requirements tracking
+   - Priority calculation
+   - Waiting list management
+
+3. Hospital Operations
+   - Hospital verification on blockchain
+   - Organ matching confirmation
+   - Transplant record management
+   - Smart contract-based verification
+
+4. Matching System
+   - Automated organ matching algorithm
+   - Priority-based allocation
+   - Blood type compatibility checking
+   - HLA matching verification
+
+### Additional Development
+1. Implement smart contract testing
+2. Add blockchain transaction monitoring
+3. Develop emergency backup systems
+4. Create blockchain explorer integration
+5. Add multi-signature requirements for critical operations
+
+### Documentation & Testing
+1. Smart contract documentation
+2. Web3 integration guides
+3. Security audit preparation
+4. Gas optimization documentation
+5. Blockchain interaction guides
 
 ## 🚀 Getting Started
 
@@ -101,13 +162,19 @@ npm run dev
 
 Create a `.env.local` file with the following variables:
 ```
+# Firebase Configuration
 NEXT_PUBLIC_FIREBASE_API_KEY=
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
-NEXT7_PUBLIC_FIREBASE_PROJECT_ID=
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=
 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
 NEXT_PUBLIC_FIREBASE_APP_ID=
-```7
+
+# ThirdWeb Configuration
+NEXT_PUBLIC_THIRDWEB_CLIENT_ID=
+NEXT_PUBLIC_SMART_CONTRACT_ADDRESS=
+NEXT_PUBLIC_NETWORK_NAME=sepolia
+```
 
 ## 📄 License
 
