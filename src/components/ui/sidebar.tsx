@@ -1,7 +1,6 @@
 "use client"
 
 import * as React from "react"
-import { Slot } from "@radix-ui/react-slot"
 import { VariantProps, cva } from "class-variance-authority"
 import { PanelLeftIcon } from "lucide-react"
 
@@ -10,13 +9,6 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Tooltip,
@@ -151,6 +143,61 @@ function SidebarProvider({
   )
 }
 
+function MobileSidebar({ 
+  open, 
+  onOpenChange, 
+  side = "left",
+  children,
+  className,
+  ...props 
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  side?: "left" | "right"
+  children: React.ReactNode
+  className?: string
+}) {
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50">
+      <div 
+        className="fixed inset-0 bg-black/20" 
+        onClick={() => onOpenChange(false)}
+      />
+      <div 
+        className={cn(
+          "fixed inset-y-0 bg-white dark:bg-gray-800 w-[var(--sidebar-width)] p-6",
+          side === "left" ? "left-0" : "right-0",
+          className
+        )}
+        {...props}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function Slottable({ 
+  asChild, 
+  children, 
+  ...props 
+}: { 
+  asChild?: boolean
+  children: React.ReactNode 
+} & React.HTMLAttributes<HTMLElement>) {
+  if (!asChild || !React.isValidElement(children)) {
+    return <div {...props}>{children}</div>;
+  }
+
+  return React.cloneElement(children, {
+    ...props,
+    ...children.props,
+    className: cn(props.className, children.props.className),
+  });
+}
+
 function Sidebar({
   side = "left",
   variant = "sidebar",
@@ -182,26 +229,18 @@ function Sidebar({
 
   if (isMobile) {
     return (
-      <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
-        <SheetContent
-          data-sidebar="sidebar"
-          data-slot="sidebar"
-          data-mobile="true"
-          className="bg-sidebar text-sidebar-foreground w-(--sidebar-width) p-0 [&>button]:hidden"
-          style={
-            {
-              "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
-            } as React.CSSProperties
-          }
-          side={side}
-        >
-          <SheetHeader className="sr-only">
-            <SheetTitle>Sidebar</SheetTitle>
-            <SheetDescription>Displays the mobile sidebar.</SheetDescription>
-          </SheetHeader>
-          <div className="flex h-full w-full flex-col">{children}</div>
-        </SheetContent>
-      </Sheet>
+      <MobileSidebar
+        open={openMobile}
+        onOpenChange={setOpenMobile}
+        side={side}
+        className={cn(
+          "bg-sidebar text-sidebar-foreground w-(--sidebar-width) p-0",
+          className
+        )}
+        {...props}
+      >
+        {children}
+      </MobileSidebar>
     )
   }
 
@@ -398,15 +437,11 @@ function SidebarGroupLabel({
   asChild = false,
   ...props
 }: React.ComponentProps<"div"> & { asChild?: boolean }) {
-  const Comp = asChild ? Slot : "div"
-
   return (
-    <Comp
-      data-slot="sidebar-group-label"
-      data-sidebar="group-label"
+    <Slottable
+      asChild={asChild}
       className={cn(
-        "text-sidebar-foreground/70 ring-sidebar-ring flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium outline-hidden transition-[margin,opacity] duration-200 ease-linear focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
-        "group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0",
+        "text-sidebar-foreground/60 text-xs font-medium uppercase",
         className
       )}
       {...props}

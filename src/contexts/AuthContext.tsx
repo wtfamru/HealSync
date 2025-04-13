@@ -19,6 +19,9 @@ interface UserData {
   hospitalName?: string;
   role: UserRole;
   email: string;
+  isSubmitted?: boolean;
+  dob?: string;
+  age?: number;
 }
 
 interface AuthContextType {
@@ -26,9 +29,10 @@ interface AuthContextType {
   userData: UserData | null;
   userRole: UserRole;
   loading: boolean;
-  login: (email: string, password: string) => Promise<UserRole>;
+  login: (email: string, password: string) => Promise<{ role: UserRole; isSubmitted: boolean }>;
   register: (email: string, password: string, role: UserRole, userData: Partial<UserData>) => Promise<void>;
   logout: () => Promise<void>;
+  updateUserData: (data: Partial<UserData>) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -70,9 +74,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string) => {
     const { user } = await signInWithEmailAndPassword(auth, email, password);
     const userDoc = await getDoc(doc(db, "users", user.uid));
-    const role = userDoc.data()?.role || null;
+    const data = userDoc.data() as UserData;
+    const role = data?.role || null;
     setUserRole(role);
-    return role;
+    return { role, isSubmitted: data?.isSubmitted || false };
   };
 
   const logout = async () => {
@@ -80,8 +85,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUserRole(null);
   };
 
+  const updateUserData = async (data: Partial<UserData>) => {
+    if (userData) {
+      await setDoc(doc(db, "users", user!.uid), {
+        ...userData,
+        ...data
+      });
+      setUserData({ ...userData, ...data });
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, userData, userRole, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, userData, userRole, loading, login, register, logout, updateUserData }}>
       {!loading && children}
     </AuthContext.Provider>
   );

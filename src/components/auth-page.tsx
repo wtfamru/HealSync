@@ -12,6 +12,9 @@ import { useAuth } from "@/contexts/AuthContext"
 import { useRouter } from "next/navigation"
 import { toast } from 'sonner'
 import Link from "next/link"
+import { doc, setDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase"
+import { auth } from "@/lib/firebase"
 
 interface RegisterFormState {
   firstName?: string
@@ -60,9 +63,9 @@ export default function AuthPage() {
 
   // Function to get user-friendly error messages
   const getErrorMessage = (error: any) => {
-    console.log('Firebase Error:', error); // Debug log
+    console.log('Firebase Error:', error);
     const errorCode = error?.code || error?.message?.split('(')[0]?.trim();
-    console.log('Error Code:', errorCode); // Debug log
+    console.log('Error Code:', errorCode);
     
     switch (errorCode) {
       case 'auth/email-already-in-use':
@@ -95,16 +98,24 @@ export default function AuthPage() {
     setIsLoading(true);
 
     try {
-      const role = await login(loginEmail, loginPassword);
-      toast.success('Login Successful');
+      console.log("Attempting login...");
+      const { role, isSubmitted } = await login(loginEmail, loginPassword);
+      console.log("Login successful. Role:", role, "isSubmitted:", isSubmitted);
       
-      // Use the role returned directly from the login function
       if (role === "donor") {
-        router.push("/donor-dashboard");
+        if (isSubmitted) {
+          console.log("Redirecting to donor dashboard with submitted=true");
+          router.push("/donor-dashboard?submitted=true");
+        } else {
+          console.log("Redirecting to donor dashboard without submitted parameter");
+          router.push("/donor-dashboard");
+        }
       } else if (role === "hospital") {
+        console.log("Redirecting to hospital dashboard");
         router.push("/hospital-dashboard");
       }
     } catch (error: any) {
+      console.error("Login error:", error);
       const errorMessage = getErrorMessage(error);
       toast.error('Login Failed', {
         description: errorMessage
@@ -124,6 +135,20 @@ export default function AuthPage() {
     setIsLoading(true);
 
     try {
+      // Validate passwords match
+      if (registerForm.password !== registerForm.confirmPassword) {
+        throw new Error("Passwords do not match");
+      }
+
+      // Validate required fields
+      if (registerForm.accountType === "hospital" && !registerForm.hospitalName) {
+        throw new Error("Hospital name is required");
+      }
+
+      if (registerForm.accountType === "donor" && (!registerForm.firstName || !registerForm.lastName)) {
+        throw new Error("First name and last name are required");
+      }
+
       const userData = registerForm.accountType === "hospital" 
         ? {
             hospitalName: registerForm.hospitalName,
@@ -131,8 +156,10 @@ export default function AuthPage() {
         : {
             firstName: registerForm.firstName,
             lastName: registerForm.lastName,
+            isSubmitted: false,
           };
 
+      // Register the user
       await register(
         registerForm.email,
         registerForm.password,

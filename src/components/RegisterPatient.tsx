@@ -26,7 +26,6 @@ export default function RegisterPatient() {
     tissueType: "",
     hlaMatch: "",
     urgency: "",
-    medicalHistory: "",
     file: null as File | null,
   })
   const [fileUrl, setFileUrl] = useState<string | null>(null);
@@ -213,18 +212,6 @@ export default function RegisterPatient() {
                 )}
               </div>
             </div>
-          </div>
-
-          <div className="space-y-1 pt-2">
-            <Label htmlFor="medicalHistory">Medical History</Label>
-            <Textarea
-              id="medicalHistory"
-              value={formData.medicalHistory}
-              onChange={(e) => setFormData({ ...formData, medicalHistory: e.target.value })}
-              placeholder="Enter patient's medical history..."
-              required
-              className="h-24"
-            />
           </div>
 
           <Button type="submit" className="w-full bg-[#5AA7A7] hover:bg-[#4A9696] mt-4">

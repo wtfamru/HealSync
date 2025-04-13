@@ -1,6 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
+import { collection, query, where, getDocs, updateDoc, doc, addDoc, deleteDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase"
+import { toast } from "sonner"
 import {
   Users,
   UserCheck,
@@ -19,6 +25,8 @@ import {
   Search,
   Clock,
   HeartPulse,
+  ChevronsUpDown,
+  Check,
 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
@@ -43,11 +51,304 @@ import ViewDonors from "./ViewDonors"
 import ViewPatients from "./ViewPatients"
 import MatchDonors from "./MatchDonors"
 import TransplantRecords from "./TransplantRecords"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import DonorRegistration from "./donor-registration"
+import { cn } from "@/lib/utils"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command"
+
+const formSchema = z.object({
+  donorId: z.string().min(1, "Please select a donor"),
+  organ: z.string().min(1, "Please select an organ"),
+  bloodGroup: z.string(),
+  hlaMatch: z.string().min(1, "HLA match is required"),
+  tissueType: z.string().min(1, "Tissue type is required"),
+  age: z.string(),
+  gender: z.string(),
+})
+
+interface Donor {
+  id: string;
+  name: string;
+  organs: {
+    kidney: number;
+    eyes: number;
+    liver: number;
+    pancreas: number;
+    heart: number;
+    lungs: number;
+  };
+  address: {
+    street: string;
+    pincode: string;
+    city: string;
+    state: string;
+  };
+  isDeceased: boolean;
+  isRegistered: boolean;
+  bloodGroup?: string;
+  age?: number;
+  gender?: string;
+}
+
+interface RegisteredDonor {
+  id: string;
+  donorId: string;
+  donorName: string;
+  organ: string;
+  bloodGroup: string;
+  hlaMatch: string;
+  tissueType: string;
+  age: string;
+  gender: string;
+  reportPdfUrl: string;
+  isVerified: boolean;
+  registeredAt: string;
+  verifiedAt?: string;
+}
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("dashboard")
   const { user, userData, logout } = useAuth()
   const router = useRouter()
+  const [availableDonors, setAvailableDonors] = useState<Donor[]>([])
+  const [deceasedDonors, setDeceasedDonors] = useState<Donor[]>([])
+  const [selectedDonor, setSelectedDonor] = useState<Donor | null>(null)
+  const [availableOrgans, setAvailableOrgans] = useState<string[]>([])
+  const [searchTerm, setSearchTerm] = useState("")
+  const [pledgeSearchTerm, setPledgeSearchTerm] = useState("")
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false)
+  const [selectedPledge, setSelectedPledge] = useState<Donor | null>(null)
+  const [registeredDonors, setRegisteredDonors] = useState<RegisteredDonor[]>([])
+  const [open, setOpen] = useState(false)
+  const [viewPledge, setViewPledge] = useState<Donor | null>(null)
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      donorId: "",
+      organ: "",
+      bloodGroup: "",
+      hlaMatch: "",
+      tissueType: "",
+      age: "",
+      gender: "",
+    },
+  })
+
+  useEffect(() => {
+    fetchDeceasedDonors()
+    fetchPledges()
+    fetchRegisteredDonors()
+  }, [])
+
+  const fetchDeceasedDonors = async () => {
+    try {
+      const donorsQuery = query(
+        collection(db, "hospitals", user?.uid || "", "pledges"),
+        where("isDeceased", "==", true),
+        where("isRegistered", "==", false)
+      )
+      const querySnapshot = await getDocs(donorsQuery)
+      const donorsList = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Donor[]
+      setDeceasedDonors(donorsList)
+    } catch (error) {
+      console.error("Error fetching donors:", error)
+      toast.error("Failed to load donors")
+    }
+  }
+
+  const fetchPledges = async () => {
+    try {
+      const pledgesQuery = query(
+        collection(db, "hospitals", user?.uid || "", "pledges")
+      )
+      const querySnapshot = await getDocs(pledgesQuery)
+      const pledgesList = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Donor[]
+      setAvailableDonors(pledgesList)
+    } catch (error) {
+      console.error("Error fetching pledges:", error)
+      toast.error("Failed to load pledges")
+    }
+  }
+
+  const fetchRegisteredDonors = async () => {
+    try {
+      const registeredQuery = query(
+        collection(db, "hospitals", user?.uid || "", "registered_donors")
+      )
+      const querySnapshot = await getDocs(registeredQuery)
+      const registeredList = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as RegisteredDonor[]
+      setRegisteredDonors(registeredList)
+    } catch (error) {
+      console.error("Error fetching registered donors:", error)
+      toast.error("Failed to load registered donors")
+    }
+  }
+
+  const handleDonorSelect = (donorId: string) => {
+    const donor = availableDonors.find(d => d.id === donorId)
+    if (donor) {
+      setSelectedDonor(donor)
+      form.setValue("donorId", donorId)
+      form.setValue("bloodGroup", donor.bloodGroup || "")
+      form.setValue("age", donor.age?.toString() || "")
+      form.setValue("gender", donor.gender || "")
+      form.setValue("organ", "")
+      form.setValue("hlaMatch", "")
+      form.setValue("tissueType", "")
+      
+      // Define which organs can be donated based on deceased status
+      const allowedOrgans = donor.isDeceased
+        ? ["kidney", "liver", "pancreas", "eyes", "lungs", "heart"]
+        : ["kidney", "liver", "pancreas"]
+      
+      const availableOrgans = Object.entries(donor.organs)
+        .filter(([organ, count]) => 
+          count > 0 && allowedOrgans.includes(organ.toLowerCase())
+        )
+        .map(([organ]) => organ.toLowerCase())
+      
+      setAvailableOrgans(availableOrgans)
+    }
+  }
+
+  const handleMarkDeceased = async () => {
+    if (!selectedPledge) return
+
+    try {
+      const pledgeRef = doc(db, "hospitals", user?.uid || "", "pledges", selectedPledge.id)
+      await updateDoc(pledgeRef, {
+        isDeceased: true
+      })
+      
+      // Update both states
+      setAvailableDonors(prev => prev.map(d => 
+        d.id === selectedPledge.id ? { ...d, isDeceased: true } : d
+      ))
+      setDeceasedDonors(prev => [...prev, { ...selectedPledge, isDeceased: true }])
+      
+      // If the currently selected donor is the one being marked as deceased,
+      // update their available organs
+      if (selectedDonor && selectedDonor.id === selectedPledge.id) {
+        const updatedSelectedDonor = { ...selectedDonor, isDeceased: true }
+        setSelectedDonor(updatedSelectedDonor)
+        
+        // Update available organs based on new deceased status
+        const allowedOrgans = ["kidney", "liver", "pancreas", "eyes", "lungs", "heart"]
+        const availableOrgans = Object.entries(updatedSelectedDonor.organs)
+          .filter(([organ, count]) => 
+            count > 0 && allowedOrgans.includes(organ.toLowerCase())
+          )
+          .map(([organ]) => organ.toLowerCase())
+        
+        setAvailableOrgans(availableOrgans)
+      }
+      
+      // Refresh data from the database
+      await Promise.all([
+        fetchDeceasedDonors(),
+        fetchPledges()
+      ])
+      
+      toast.success("Donor marked as deceased")
+      setShowConfirmDialog(false)
+      setSelectedPledge(null)
+    } catch (error) {
+      console.error("Error updating pledge:", error)
+      toast.error("Failed to update donor status")
+    }
+  }
+
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    if (!selectedDonor) return
+
+    try {
+      const registeredRef = collection(db, "hospitals", user?.uid || "", "registered_donors")
+      await addDoc(registeredRef, {
+        donorId: selectedDonor.id,
+        donorName: selectedDonor.name,
+        organ: values.organ,
+        bloodGroup: values.bloodGroup,
+        hlaMatch: values.hlaMatch,
+        tissueType: values.tissueType,
+        age: values.age,
+        gender: values.gender,
+        reportPdfUrl: "",
+        isVerified: false,
+        registeredAt: new Date().toISOString(),
+      })
+
+      // Update the organ count in the pledges collection
+      const pledgeRef = doc(db, "hospitals", user?.uid || "", "pledges", selectedDonor.id)
+      const organCount = selectedDonor.organs[values.organ as keyof typeof selectedDonor.organs]
+      const updatedOrgans = {
+        ...selectedDonor.organs,
+        [values.organ]: organCount - 1
+      }
+
+      // Check if all organs are now 0
+      const allOrgansZero = Object.values(updatedOrgans).every(count => count === 0)
+
+      if (allOrgansZero) {
+        // If all organs are 0, delete the pledge document
+        await deleteDoc(pledgeRef)
+        // Update local state for deceased donors
+        setDeceasedDonors(prev => prev.filter(d => d.id !== selectedDonor.id))
+      } else {
+        // Otherwise, just update the organ count
+        await updateDoc(pledgeRef, {
+          [`organs.${values.organ}`]: organCount - 1
+        })
+        // Update local state for deceased donors
+        setDeceasedDonors(prev => prev.map(d => 
+          d.id === selectedDonor.id ? { ...d, organs: updatedOrgans } : d
+        ))
+      }
+
+      // Reset form and selected donor
+      form.reset()
+      setSelectedDonor(null)
+      setAvailableOrgans([])
+
+      // Fetch updated data
+      await Promise.all([
+        fetchDeceasedDonors(),
+        fetchPledges(),
+        fetchRegisteredDonors()
+      ])
+
+      toast.success(allOrgansZero 
+        ? "Organ registration successful. Donor removed as all organs are registered." 
+        : "Organ registration successful")
+    } catch (error) {
+      console.error("Error registering organ:", error)
+      toast.error("Failed to register organ")
+    }
+  }
+
+  const getOrganCount = (organs: Donor["organs"]) => {
+    return Object.entries(organs)
+      .filter(([_, count]) => count > 0)
+      .map(([organ, count]) => `${organ}: ${count}`)
+      .join(", ")
+  }
+
+  const filteredPledges = availableDonors.filter(donor =>
+    !donor.isDeceased && donor.name.toLowerCase().includes(searchTerm.toLowerCase())
+  )
 
   const handleLogout = async () => {
     try {
@@ -101,6 +402,73 @@ export default function Dashboard() {
       color: "bg-[#BAC94A]/20",
     },
   ]
+
+  const handleUploadReport = async (registeredId: string, file: File) => {
+    try {
+      const fileUrl = URL.createObjectURL(file)
+      
+      const registeredRef = doc(db, "hospitals", user?.uid || "", "registered_donors", registeredId)
+      await updateDoc(registeredRef, {
+        reportPdfUrl: fileUrl
+      })
+      
+      setRegisteredDonors(prev => prev.map(d => 
+        d.id === registeredId ? { 
+          ...d, 
+          reportPdfUrl: fileUrl 
+        } : d
+      ))
+      
+      toast.success("Report uploaded successfully")
+    } catch (error) {
+      console.error("Error uploading report:", error)
+      toast.error("Failed to upload report")
+    }
+  }
+
+  const handleVerifyDonor = async (registeredId: string) => {
+    try {
+      const registeredRef = doc(db, "hospitals", user?.uid || "", "registered_donors", registeredId)
+      await updateDoc(registeredRef, {
+        isVerified: true,
+        verifiedAt: new Date().toISOString()
+      })
+      
+      setRegisteredDonors(prev => prev.map(d => 
+        d.id === registeredId ? { 
+          ...d, 
+          isVerified: true, 
+          verifiedAt: new Date().toISOString()
+        } : d
+      ))
+      
+      toast.success("Donor verified successfully")
+    } catch (error) {
+      console.error("Error verifying donor:", error)
+      toast.error("Failed to verify donor")
+    }
+  }
+
+  const handleRemovePdf = async (registeredId: string) => {
+    try {
+      const registeredRef = doc(db, "hospitals", user?.uid || "", "registered_donors", registeredId)
+      await updateDoc(registeredRef, {
+        reportPdfUrl: ""
+      })
+      
+      setRegisteredDonors(prev => prev.map(d => 
+        d.id === registeredId ? { 
+          ...d, 
+          reportPdfUrl: "" 
+        } : d
+      ))
+      
+      toast.success("Report removed successfully")
+    } catch (error) {
+      console.error("Error removing report:", error)
+      toast.error("Failed to remove report")
+    }
+  }
 
   const renderContent = () => {
     switch (activeTab) {
@@ -191,7 +559,7 @@ export default function Dashboard() {
                       >
                         <path
                           fillRule="evenodd"
-                          d="M12 13a1 1 0 100 2h5a1 1 0 001-1V9a1 1 0 10-2 0v2.586l-4.293-4.293a1 1 0 00-1.414 0L8 9.586 3.707 5.293a1 1 0 00-1.414 1.414l5 5a1 1 0 001.414 0L11 9.414 14.586 13H12z"
+                          d="M12 13a1 1 0 100 2h5a1 1 0 001-1V9a1 1 0 10-2 0v2.586l-4.293-4.293a1 1 0 00-1.414 1.414l5 5a1 1 0 001.414 0L11 9.414 14.586 13H12z"
                           clipRule="evenodd"
                         ></path>
                       </svg>
@@ -302,7 +670,350 @@ export default function Dashboard() {
           </>
         )
       case "register-donor":
-        return <RegisterDonor />
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Register Donor</CardTitle>
+                <CardDescription>Select a donor and register their organs</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="donorId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Select Donor</FormLabel>
+                          <div className="relative">
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={open}
+                              className="w-full justify-between"
+                              onClick={() => setOpen(!open)}
+                            >
+                              {field.value
+                                ? availableDonors.find((donor) => donor.id === field.value)?.name
+                                : "Select donor..."}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                            {open && (
+                              <div className="absolute mt-2 w-full rounded-md border bg-white p-0 shadow-md">
+                                <Input
+                                  placeholder="Search donors..."
+                                  value={searchTerm}
+                                  onChange={(e) => setSearchTerm(e.target.value)}
+                                  className="border-0 focus:ring-0"
+                                />
+                                <div className="max-h-[200px] overflow-y-auto">
+                                  {availableDonors
+                                    .filter(donor =>
+                                      donor.name.toLowerCase().includes(searchTerm.toLowerCase())
+                                    )
+                                    .map(donor => (
+                                      <div
+                                        key={donor.id}
+                                        onClick={() => {
+                                          field.onChange(donor.id);
+                                          handleDonorSelect(donor.id);
+                                          setSearchTerm("");
+                                          setOpen(false);
+                                        }}
+                                        className={cn(
+                                          "flex items-center gap-2 px-2 py-1.5 cursor-pointer hover:bg-[#5AA7A7]/10",
+                                          field.value === donor.id && "bg-[#5AA7A7]/10"
+                                        )}
+                                      >
+                                        <Check
+                                          className={cn(
+                                            "h-4 w-4 text-[#5AA7A7]",
+                                            field.value === donor.id ? "opacity-100" : "opacity-0"
+                                          )}
+                                        />
+                                        <span>{donor.name}</span>
+                                      </div>
+                                    ))}
+                                  {availableDonors.filter(donor =>
+                                    donor.name.toLowerCase().includes(searchTerm.toLowerCase())
+                                  ).length === 0 && (
+                                    <div className="px-2 py-1.5 text-sm text-gray-500">
+                                      No donors found
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="organ"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Select Organ</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger className="cursor-pointer">
+                                <SelectValue placeholder="Select an organ" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {availableOrgans.map((organ) => (
+                                <SelectItem key={organ} value={organ} className="cursor-pointer">
+                                  {organ}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="bloodGroup"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Blood Group</FormLabel>
+                          <FormControl>
+                            <Input {...field} disabled placeholder="Auto-filled from donor data" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="age"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Age</FormLabel>
+                          <FormControl>
+                            <Input {...field} disabled placeholder="Auto-filled from donor data" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="gender"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Gender</FormLabel>
+                          <FormControl>
+                            <Input {...field} disabled placeholder="Auto-filled from donor data" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="hlaMatch"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>HLA Match</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Enter HLA match details" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="tissueType"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Tissue Type</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Enter tissue type" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <Button type="submit" className="w-full cursor-pointer">
+                      Register Organ
+                    </Button>
+                  </form>
+                </Form>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Available Pledges</CardTitle>
+                <CardDescription>List of donors who have pledged their organs</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <Input
+                    placeholder="Search pledges..."
+                    value={pledgeSearchTerm}
+                    onChange={(e) => setPledgeSearchTerm(e.target.value)}
+                    className="mb-4"
+                  />
+                  {availableDonors
+                    .filter(donor => 
+                      donor.name.toLowerCase().includes(pledgeSearchTerm.toLowerCase())
+                    )
+                    .map((donor) => (
+                      <Card key={donor.id} className="p-4">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-medium">{donor.name}</h3>
+                              <span className={cn(
+                                "px-2 py-1 rounded-full text-xs font-medium",
+                                donor.isDeceased 
+                                  ? "bg-red-100 text-red-700" 
+                                  : "bg-emerald-100 text-emerald-700"
+                              )}>
+                                {donor.isDeceased ? "Deceased" : "Active"}
+                              </span>
+                            </div>
+                            <p className="text-sm text-gray-500">
+                              {Object.entries(donor.organs)
+                                .filter(([_, count]) => count > 0)
+                                .map(([organ, count]) => `${organ}: ${count}`)
+                                .join(", ")}
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setViewPledge(donor)}
+                              className="cursor-pointer"
+                            >
+                              View Pledge
+                            </Button>
+                            <Button
+                              variant="outline"
+                              onClick={() => {
+                                setSelectedPledge(donor);
+                                setShowConfirmDialog(true);
+                              }}
+                              disabled={donor.isDeceased}
+                              className="cursor-pointer"
+                            >
+                              Mark Deceased
+                            </Button>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )
+      case "verify-donor":
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle>Verify Registered Donors</CardTitle>
+              <CardDescription>List of donors who have registered their organs</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {registeredDonors.map((registered) => (
+                  <Card key={registered.id} className="p-4">
+                    <div className="flex justify-between items-center">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-medium">{registered.donorName}</h3>
+                          {registered.isVerified ? (
+                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                              Verified
+                            </span>
+                          ) : (
+                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
+                              Pending Verification
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-sm text-gray-500 space-y-1">
+                          <p>Organ: {registered.organ}</p>
+                          <p>Blood Group: {registered.bloodGroup}</p>
+                          <p>Age: {registered.age}</p>
+                          <p>Gender: {registered.gender}</p>
+                          <p>HLA Match: {registered.hlaMatch}</p>
+                          <p>Tissue Type: {registered.tissueType}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          {!registered.isVerified ? (
+                            <div className="flex gap-2 items-center">
+                              {!registered.reportPdfUrl ? (
+                                <div className="flex gap-2 flex-1">
+                                  <Input
+                                    type="file"
+                                    accept=".pdf"
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0]
+                                      if (file) {
+                                        handleUploadReport(registered.id, file)
+                                      }
+                                    }}
+                                    className="flex-1"
+                                  />
+                                </div>
+                              ) : (
+                                <>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => window.open(registered.reportPdfUrl, '_blank')}
+                                  >
+                                    <FileCheck className="h-4 w-4 mr-2" />
+                                    View Report
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => handleRemovePdf(registered.id)}
+                                  >
+                                    Remove PDF
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="default"
+                                    size="sm"
+                                    onClick={() => handleVerifyDonor(registered.id)}
+                                  >
+                                    Verify Donor
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => window.open(registered.reportPdfUrl, '_blank')}
+                            >
+                              <FileCheck className="h-4 w-4 mr-2" />
+                              View Report
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )
       case "register-patient":
         return <RegisterPatient />
       case "donor-list":
@@ -313,6 +1024,8 @@ export default function Dashboard() {
         return <MatchDonors />
       case "transplant-records":
         return <TransplantRecords />
+      case "donor-registration":
+        return <DonorRegistration />
       default:
         return null
     }
@@ -320,6 +1033,102 @@ export default function Dashboard() {
 
   return (
     <SidebarProvider>
+      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Action</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to mark {selectedPledge?.name} as deceased? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowConfirmDialog(false)}>
+              Cancel
+            </Button>
+            <Button variant="default" onClick={handleMarkDeceased}>
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!viewPledge} onOpenChange={() => setViewPledge(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Pledge Details</DialogTitle>
+            <DialogDescription>
+              Detailed information about the donor pledge
+            </DialogDescription>
+          </DialogHeader>
+          {viewPledge && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <h4 className="font-medium text-sm">Name</h4>
+                  <p className="text-sm text-gray-500">{viewPledge.name}</p>
+                </div>
+                <div>
+                  <h4 className="font-medium text-sm">Blood Group</h4>
+                  <p className="text-sm text-gray-500">{viewPledge.bloodGroup || 'Not specified'}</p>
+                </div>
+                <div>
+                  <h4 className="font-medium text-sm">Age</h4>
+                  <p className="text-sm text-gray-500">{viewPledge.age || 'Not specified'}</p>
+                </div>
+                <div>
+                  <h4 className="font-medium text-sm">Gender</h4>
+                  <p className="text-sm text-gray-500">{viewPledge.gender || 'Not specified'}</p>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-medium text-sm mb-2">Available Organs</h4>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(viewPledge.organs)
+                    .filter(([_, count]) => count > 0)
+                    .map(([organ, count]) => (
+                      <div
+                        key={organ}
+                        className="flex items-center justify-between p-2 bg-[#5AA7A7]/10 rounded-md"
+                      >
+                        <span className="capitalize">{organ}</span>
+                        <span className="text-[#5AA7A7] font-medium">{count}</span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-medium text-sm mb-2">Address</h4>
+                <div className="text-sm text-gray-500 space-y-1">
+                  <p>{viewPledge.address.street}</p>
+                  <p>{viewPledge.address.city}, {viewPledge.address.state}</p>
+                  <p>PIN: {viewPledge.address.pincode}</p>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center pt-4">
+                <div className={cn(
+                  "px-2.5 py-0.5 rounded-full text-xs font-medium",
+                  viewPledge.isDeceased 
+                    ? "bg-red-100 text-red-700" 
+                    : "bg-emerald-100 text-emerald-700"
+                )}>
+                  {viewPledge.isDeceased ? "Deceased" : "Active"}
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => setViewPledge(null)}
+                  className="cursor-pointer"
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <div className="flex h-screen bg-gray-50">
         {/* Sidebar */}
         <Sidebar className="border-r border-gray-200">
@@ -364,6 +1173,17 @@ export default function Dashboard() {
                 >
                   <UserCheck className="h-5 w-5" />
                   <span>Register Patient</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={activeTab === "verify-donor"}
+                  onClick={() => setActiveTab("verify-donor")}
+                  className="cursor-pointer hover:bg-gradient-to-r from-[#6C8CBF]/10 to-[#5AA7A7]/10 rounded-2xl"
+                >
+                  <UserCheck className="h-5 w-5" />
+                  <span>Verify Donor</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
@@ -458,6 +1278,7 @@ export default function Dashboard() {
               {activeTab === "waiting-list" && "Waiting List"}
               {activeTab === "transplant-match" && "Transplant Match"}
               {activeTab === "transplant-records" && "Transplant Records"}
+              {activeTab === "verify-donor" && "Verify Donor"}
             </h1>
           </header>
 

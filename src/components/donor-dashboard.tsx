@@ -2,23 +2,25 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
-import { CalendarIcon, Heart } from "lucide-react"
+import { CalendarIcon, Heart, CheckCircle2 } from "lucide-react"
 import { format } from "date-fns"
 import { useAuth } from "@/contexts/AuthContext"
-import { useRouter } from "next/navigation"
-
+import { useRouter, useSearchParams } from "next/navigation"
+import { useEffect, useState } from "react"
+import { collection, query, where, getDocs, doc, setDoc, updateDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase"
+import { toast } from 'sonner'
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Switch } from "@/components/ui/switch"
-import { toast } from 'sonner'
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { DatePickerField } from "@/components/ui/date-picker-field"
 
 const formSchema = z.object({
@@ -63,32 +65,83 @@ const formSchema = z.object({
   state: z.string().min(1, {
     message: "State is required.",
   }),
-  donateEyes: z.boolean().default(false),
-  donateHeart: z.boolean().default(false),
-  donateKidney: z.boolean().default(false),
-  donateLungs: z.boolean().default(false),
+  kidney: z.enum(["0", "1", "2"], {
+    required_error: "Please select kidney donation preference.",
+  }),
+  eyes: z.enum(["0", "1", "2"], {
+    required_error: "Please select eyes donation preference.",
+  }),
+  liver: z.boolean().default(false),
+  pancreas: z.boolean().default(false),
+  heart: z.boolean().default(false),
+  lungs: z.boolean().default(false),
   weight: z.string().min(1, {
     message: "Weight is required.",
   }),
   height: z.string().min(1, {
     message: "Height is required.",
   }),
+  hospitalId: z.string({
+    required_error: "Please select your nearest hospital.",
+  }).min(1, {
+    message: "Hospital selection is required.",
+  }),
 }).refine((data) => {
-  return data.donateEyes || data.donateHeart || data.donateKidney || data.donateLungs;
+  return data.kidney !== "0" || data.eyes !== "0" || data.liver || data.pancreas || data.heart || data.lungs;
 }, {
   message: "Please select at least one organ to donate.",
-  path: ["donateEyes"],
+  path: ["kidney"],
 });
 
 export default function DonorRegistrationForm() {
-  const { user, logout } = useAuth()
+  const { user, userData, logout, updateUserData } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const [hospitals, setHospitals] = useState<{ id: string; name: string }[]>([])
+  const [loading, setLoading] = useState(true)
+  const [isSubmitted, setIsSubmitted] = useState(
+    userData?.isSubmitted || searchParams.get("submitted") === "true"
+  )
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [age, setAge] = useState<number>(userData?.age || 0)
+
+  useEffect(() => {
+    console.log("Donor Dashboard - userData:", userData);
+    console.log("Donor Dashboard - isSubmitted state:", isSubmitted);
+    console.log("Donor Dashboard - searchParams submitted:", searchParams.get("submitted"));
+  }, [userData, isSubmitted, searchParams]);
+
+  useEffect(() => {
+    const fetchHospitals = async () => {
+      try {
+        const hospitalsQuery = query(
+          collection(db, "users"),
+          where("role", "==", "hospital")
+        )
+        const querySnapshot = await getDocs(hospitalsQuery)
+        const hospitalsList = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          name: doc.data().hospitalName || "Unnamed Hospital"
+        }))
+        setHospitals(hospitalsList)
+      } catch (error) {
+        console.error("Error fetching hospitals:", error)
+        toast.error("Failed to load hospitals")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchHospitals()
+  }, [])
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       gender: undefined,
-      firstName: "",
-      lastName: "",
+      firstName: userData?.firstName || "",
+      lastName: userData?.lastName || "",
+      dob: userData?.dob ? new Date(userData.dob) : undefined,
       bloodGroup: "",
       idType: "",
       idNumber: "",
@@ -96,26 +149,122 @@ export default function DonorRegistrationForm() {
       pincode: "",
       city: "",
       state: "",
-      donateEyes: false,
-      donateHeart: false,
-      donateKidney: false,
-      donateLungs: false,
+      kidney: "0",
+      eyes: "0",
+      liver: false,
+      pancreas: false,
+      heart: false,
+      lungs: false,
       weight: "",
       height: "",
+      hospitalId: "",
     },
   })
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    const formData = {
-      ...values,
-      userId: user?.uid,
-      createdAt: new Date().toISOString()
+  useEffect(() => {
+    if (userData?.dob) {
+      const date = new Date(userData.dob)
+      form.setValue("dob", date)
+      const calculatedAge = calculateAge(userData.dob)
+      setAge(calculatedAge)
+    }
+  }, [userData?.dob, form])
+
+  const calculateAge = (dob: string) => {
+    const birthDate = new Date(dob)
+    const today = new Date()
+    let age = today.getFullYear() - birthDate.getFullYear()
+    const monthDiff = today.getMonth() - birthDate.getMonth()
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--
     }
     
-    console.log(formData)
-    toast.success('Registration Successful', {
-      description: 'Thank you for registering as a donor.',
-    })
+    return age
+  }
+
+  const handleDobChange = (date: Date | undefined) => {
+    if (!date) return
+    form.setValue("dob", date)
+    const dateString = date.toISOString().split('T')[0]
+    const calculatedAge = calculateAge(dateString)
+    setAge(calculatedAge)
+  }
+
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    try {
+      // Check if already submitted
+      if (userData?.isSubmitted) {
+        toast.error('Form already submitted', {
+          description: 'You have already submitted your pledge form.',
+        });
+        return;
+      }
+
+      // Structure the pledge data
+      const pledgeData = {
+        // Basic donor information
+        name: `${values.firstName} ${values.lastName}`,
+        gender: values.gender,
+        dob: values.dob,
+        age: age,
+        bloodGroup: values.bloodGroup,
+        weight: values.weight,
+        height: values.height,
+        
+        // Organ donation preferences
+        organs: {
+          kidney: parseInt(values.kidney),
+          eyes: parseInt(values.eyes),
+          liver: values.liver ? 1 : 0,
+          pancreas: values.pancreas ? 1 : 0,
+          heart: values.heart ? 1 : 0,
+          lungs: values.lungs ? 1 : 0,
+        },
+        
+        // Status flags
+        isRegistered: false,
+        isDeceased: false,
+        
+        // Contact and identification
+        address: {
+          street: values.address,
+          pincode: values.pincode,
+          city: values.city,
+          state: values.state,
+        },
+        idType: values.idType,
+        idNumber: values.idNumber,
+        
+        // Metadata
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        userId: user?.uid,
+        hospitalId: values.hospitalId,
+      }
+
+      // Send to hospital's database
+      const hospitalPledgeRef = doc(db, "hospitals", values.hospitalId, "pledges", user?.uid || "");
+      
+      await setDoc(hospitalPledgeRef, pledgeData);
+
+      // Update user's isSubmitted status
+      const userRef = doc(db, "users", user?.uid || "");
+      await updateDoc(userRef, {
+        isSubmitted: true
+      });
+
+      setIsSubmitted(true);
+      
+      toast.success('Pledge Submitted Successfully', {
+        description: 'Your organ donation pledge has been recorded.',
+      });
+    } catch (error) {
+      console.error("Error submitting pledge:", error);
+      toast.error('Failed to Submit Pledge', {
+        description: 'Please try again later.',
+      });
+    }
   }
 
   const handleLogout = async () => {
@@ -125,6 +274,30 @@ export default function DonorRegistrationForm() {
     } catch (error) {
       console.error("Failed to logout:", error)
     }
+  }
+
+  if (isSubmitted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#96D7C6]/10 to-white">
+        <div className="text-center space-y-6">
+          <div className="relative">
+            <CheckCircle2 className="w-24 h-24 text-[#5AA7A7] mx-auto animate-bounce" />
+          </div>
+          <h1 className="text-3xl font-bold text-[#6C8CBF]">Pledge Submitted Successfully!</h1>
+          <p className="text-gray-600 max-w-md mx-auto">
+            Thank you for your pledge. The hospital will contact you for further details.
+            Please wait for their response.
+          </p>
+          <Button
+            onClick={handleLogout}
+            variant="outline"
+            className="text-[#5AA7A7] hover:text-[#4A9696] border-[#5AA7A7] hover:border-[#4A9696] hover:bg-[#4A9696]/10 cursor-pointer"
+          >
+            Logout
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -193,7 +366,8 @@ export default function DonorRegistrationForm() {
                         <Input
                           placeholder="Enter your first name"
                           {...field}
-                          className="border-gray-400 focus:border-[#5AA7A7] focus:ring-[#5AA7A7]"
+                          disabled
+                          className="border-gray-400 focus:border-[#5AA7A7] focus:ring-[#5AA7A7] bg-gray-100"
                         />
                       </FormControl>
                       <FormMessage />
@@ -210,7 +384,8 @@ export default function DonorRegistrationForm() {
                         <Input
                           placeholder="Enter your last name"
                           {...field}
-                          className="border-gray-400 focus:border-[#5AA7A7] focus:ring-[#5AA7A7]"
+                          disabled
+                          className="border-gray-400 focus:border-[#5AA7A7] focus:ring-[#5AA7A7] bg-gray-100"
                         />
                       </FormControl>
                       <FormMessage />
@@ -227,8 +402,8 @@ export default function DonorRegistrationForm() {
                     <FormLabel className="text-gray-600">Date of Birth</FormLabel>
                     <FormControl>
                       <DatePickerField
-                        value={field.value}
-                        onChange={field.onChange}
+                        value={field.value ? new Date(field.value) : undefined}
+                        onChange={handleDobChange}
                         minDate={new Date("1900-01-01")}
                         maxDate={new Date()}
                         placeholder="Pick a date"
@@ -240,6 +415,14 @@ export default function DonorRegistrationForm() {
                   </FormItem>
                 )}
               />
+
+              <FormItem>
+                <FormLabel>Age</FormLabel>
+                <FormControl>
+                  <Input value={age} readOnly />
+                </FormControl>
+                <FormDescription>Automatically calculated from date of birth</FormDescription>
+              </FormItem>
 
               <FormField
                 control={form.control}
@@ -389,77 +572,205 @@ export default function DonorRegistrationForm() {
             </div>
 
             <div className="space-y-4">
+              <h2 className="text-xl font-semibold text-[#6C8CBF]">Hospital Selection</h2>
+
+              <FormField
+                control={form.control}
+                name="hospitalId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-gray-600">Nearest Hospital</FormLabel>
+                    <FormControl>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                        disabled={loading}
+                      >
+                        <SelectTrigger className="border-gray-400 cursor-pointer">
+                          <SelectValue placeholder={loading ? "Loading hospitals..." : "Select your nearest hospital"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {hospitals.map((hospital) => (
+                            <SelectItem
+                              key={hospital.id}
+                              value={hospital.id}
+                              className="cursor-pointer"
+                            >
+                              {hospital.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="space-y-4">
               <h2 className="text-xl font-semibold text-[#6C8CBF]">Donation Preferences</h2>
 
               <div className="space-y-4">
                 <p className="text-gray-600 font-medium">Organs you wish to donate:</p>
-                <FormField
-                  control={form.control}
-                  name="donateEyes"
-                  render={({ field }) => (
-                    <FormItem>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="kidney"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-gray-600">Kidney</FormLabel>
+                        <FormControl>
+                          <div className="flex space-x-2">
+                            <Button
+                              type="button"
+                              variant={field.value === "0" ? "default" : "outline"}
+                              onClick={() => field.onChange("0")}
+                              className="flex-1"
+                            >
+                              No
+                            </Button>
+                            <Button
+                              type="button"
+                              variant={field.value === "1" ? "default" : "outline"}
+                              onClick={() => field.onChange("1")}
+                              className="flex-1"
+                            >
+                              One
+                            </Button>
+                            <Button
+                              type="button"
+                              variant={field.value === "2" ? "default" : "outline"}
+                              onClick={() => field.onChange("2")}
+                              className="flex-1"
+                            >
+                              Both
+                            </Button>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="eyes"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-gray-600">Eyes</FormLabel>
+                        <FormControl>
+                          <div className="flex space-x-2">
+                            <Button
+                              type="button"
+                              variant={field.value === "0" ? "default" : "outline"}
+                              onClick={() => field.onChange("0")}
+                              className="flex-1"
+                            >
+                              No
+                            </Button>
+                            <Button
+                              type="button"
+                              variant={field.value === "1" ? "default" : "outline"}
+                              onClick={() => field.onChange("1")}
+                              className="flex-1"
+                            >
+                              One
+                            </Button>
+                            <Button
+                              type="button"
+                              variant={field.value === "2" ? "default" : "outline"}
+                              onClick={() => field.onChange("2")}
+                              className="flex-1"
+                            >
+                              Both
+                            </Button>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="liver"
+                    render={({ field }) => (
+                      <FormItem>
                         <FormControl>
                           <Button
                             type="button"
                             variant={field.value ? "default" : "outline"}
                             onClick={() => field.onChange(!field.value)}
-                            className={`w-full h-auto py-3 px-4 rounded-lg border cursor-pointer transition-colors ${
-                              field.value 
-                                ? "bg-[#5AA7A7] hover:bg-[#4A9696] text-white border-[#5AA7A7]" 
-                                : "border-gray-400 hover:border-[#5AA7A7] hover:text-[#5AA7A7]"
-                            }`}
+                            className="w-full"
                           >
-                            Eyes
+                            Liver
                           </Button>
                         </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="pancreas"
+                    render={({ field }) => (
+                      <FormItem>
                         <FormControl>
                           <Button
                             type="button"
-                            variant={form.watch("donateHeart") ? "default" : "outline"}
-                            onClick={() => form.setValue("donateHeart", !form.watch("donateHeart"))}
-                            className={`w-full h-auto py-3 px-4 rounded-lg border cursor-pointer transition-colors ${
-                              form.watch("donateHeart")
-                                ? "bg-[#5AA7A7] hover:bg-[#4A9696] text-white border-[#5AA7A7]" 
-                                : "border-gray-400 hover:border-[#5AA7A7] hover:text-[#5AA7A7]"
-                            }`}
+                            variant={field.value ? "default" : "outline"}
+                            onClick={() => field.onChange(!field.value)}
+                            className="w-full"
+                          >
+                            Pancreas
+                          </Button>
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="heart"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <Button
+                            type="button"
+                            variant={field.value ? "default" : "outline"}
+                            onClick={() => field.onChange(!field.value)}
+                            className="w-full"
                           >
                             Heart
                           </Button>
                         </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="lungs"
+                    render={({ field }) => (
+                      <FormItem>
                         <FormControl>
                           <Button
                             type="button"
-                            variant={form.watch("donateKidney") ? "default" : "outline"}
-                            onClick={() => form.setValue("donateKidney", !form.watch("donateKidney"))}
-                            className={`w-full h-auto py-3 px-4 rounded-lg border cursor-pointer transition-colors ${
-                              form.watch("donateKidney")
-                                ? "bg-[#5AA7A7] hover:bg-[#4A9696] text-white border-[#5AA7A7]" 
-                                : "border-gray-400 hover:border-[#5AA7A7] hover:text-[#5AA7A7]"
-                            }`}
-                          >
-                            Kidney
-                          </Button>
-                        </FormControl>
-                        <FormControl>
-                          <Button
-                            type="button"
-                            variant={form.watch("donateLungs") ? "default" : "outline"}
-                            onClick={() => form.setValue("donateLungs", !form.watch("donateLungs"))}
-                            className={`w-full h-auto py-3 px-4 rounded-lg border cursor-pointer transition-colors ${
-                              form.watch("donateLungs")
-                                ? "bg-[#5AA7A7] hover:bg-[#4A9696] text-white border-[#5AA7A7]" 
-                                : "border-gray-400 hover:border-[#5AA7A7] hover:text-[#5AA7A7]"
-                            }`}
+                            variant={field.value ? "default" : "outline"}
+                            onClick={() => field.onChange(!field.value)}
+                            className="w-full"
                           >
                             Lungs
                           </Button>
                         </FormControl>
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -472,6 +783,8 @@ export default function DonorRegistrationForm() {
                       <FormControl>
                         <Input
                           type="number"
+                          min="0"
+                          step="0.1"
                           placeholder="Enter weight in kg"
                           {...field}
                           className="border-gray-400 focus:border-[#5AA7A7] focus:ring-[#5AA7A7]"
@@ -490,6 +803,8 @@ export default function DonorRegistrationForm() {
                       <FormControl>
                         <Input
                           type="number"
+                          min="0"
+                          step="0.1"
                           placeholder="Enter height in cm"
                           {...field}
                           className="border-gray-400 focus:border-[#5AA7A7] focus:ring-[#5AA7A7]"
