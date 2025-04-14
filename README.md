@@ -73,54 +73,60 @@ HealSync is a hybrid platform connecting organ donors with recipients, combining
 - **Smart Contract Language**: Solidity
 - **Wallet Integration**: ThirdWeb Connect
 
-## 📝 Next Steps
+## 📝Next Steps – Blockchain Integration
 
-### Immediate Priority: Blockchain Integration
-1. Deploy prepared smart contracts using ThirdWeb
-   - Donor Registration Contract
-   - Patient Registration Contract
-   - Organ Matching Contract
-   - Hospital Verification Contract
-   - Transaction Management Contract
+We are now transitioning into full blockchain integration using **ThirdWeb** for deployment and interaction with smart contracts. The goal is to build a seamless bridge between decentralized smart contract logic and Firebase for real-time data management.
 
-2. Integrate blockchain features with Firebase
-   - Connect donor registration with smart contracts
-   - Implement decentralized organ matching
-   - Store verification status on blockchain
-   - Create transparent donation tracking
-   - Enable smart contract-based hospital verification
+### Smart Contract Deployment Plan
 
-3. Add Web3 specific features
-   - Wallet connection and management
-   - Gas fee estimation and handling
-   - Transaction confirmation flows
-   - Block confirmation tracking
-   - Event subscription and real-time updates
+We will deploy and connect the following modules:
 
-### Smart Contract Features to Implement
-1. Donor Management
-   - On-chain donor registration
-   - Organ availability tracking
-   - Status updates (Active/Deceased)
-   - Donation history
+- Donor Registration Contract  
+- Patient Registration Contract  
+- Organ Matching Contract  
+- Hospital Verification Contract  
+- Transaction Management Contract
 
-2. Patient Management
-   - On-chain patient registration
-   - Organ requirements tracking
-   - Priority calculation
-   - Waiting list management
+### Integration Objectives
 
-3. Hospital Operations
-   - Hospital verification on blockchain
-   - Organ matching confirmation
-   - Transplant record management
-   - Smart contract-based verification
+- Connect donor registration with smart contracts  
+- Implement automated organ matching via on-chain logic  
+- Store hospital verification status on-chain  
+- Enable transparent donation tracking  
+- Integrate hospital verification and transplant approval workflows  
 
-4. Matching System
-   - Automated organ matching algorithm
-   - Priority-based allocation
-   - Blood type compatibility checking
-   - HLA matching verification
+### Web3 Features To Be Added
+
+- Wallet connection and management (MetaMask/WalletConnect)  
+- Gas fee estimation and transaction cost handling  
+- Transaction status tracking and user confirmations  
+- Block confirmation and finality tracking  
+- Smart contract event subscription for real-time updates  
+
+---
+
+### Smart Contract Functional Goals
+
+#### Donor Management
+- Register donors on-chain  
+- Track organ availability and status (Active/Deceased)  
+- Maintain donation history per donor  
+
+#### Patient Management
+- Register patients on-chain  
+- Track organ requirements and priority  
+- Maintain and manage dynamic waiting lists  
+
+#### Hospital Operations
+- Verify hospitals on-chain  
+- Confirm matches and transplants  
+- Maintain blockchain-based transplant records  
+
+#### Matching System
+- Implement automatic organ matching algorithm  
+- Prioritize based on urgency, blood compatibility, and HLA match  
+- Ensure fair and medically compatible allocation
+
 
 ## 🚀 Getting Started
 
