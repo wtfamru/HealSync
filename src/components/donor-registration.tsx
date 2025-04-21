@@ -26,8 +26,12 @@ const formSchema = z.object({
   donorId: z.string().min(1, "Please select a donor"),
   organ: z.string().min(1, "Please select an organ"),
   bloodGroup: z.string().min(1, "Please select a blood group"),
-  hlaMatch: z.string().min(1, "Please select an HLA match"),
-  tissueType: z.string().min(1, "Please select a tissue type"),
+  hlaMatch: z.string().refine(val => /^\d+$/.test(val), {
+    message: "HLA match must be a number",
+  }),
+  tissueType: z.string().refine(val => /^\d+$/.test(val), {
+    message: "Tissue type must be a number",
+  }),
   age: z.string().min(1, "Please enter age"),
   gender: z.string().min(1, "Please enter gender"),
 })
@@ -46,6 +50,9 @@ interface DonorData {
   age?: number
   gender?: string
 }
+
+// Use this exact format for organ names as required by the contract
+const ORGAN_NAMES = ["Heart", "Lung", "Liver", "Kidney", "Pancreas", "Eyes"];
 
 export default function DonorRegistration() {
   const { user } = useAuth()
@@ -121,12 +128,17 @@ export default function DonorRegistration() {
     if (!selectedDonor) return
 
     try {
+      // Ensure the organ name is in the proper case format
+      const standardizedOrgan = ORGAN_NAMES.find(
+        name => name.toLowerCase() === values.organ.toLowerCase()
+      ) || values.organ;
+
       // Create a new document in the registered_donors collection
       const registeredRef = collection(db, "hospitals", user?.uid || "", "registered_donors")
       await addDoc(registeredRef, {
         donorId: selectedDonor.id,
         donorName: selectedDonor.name,
-        organ: values.organ,
+        organ: standardizedOrgan, // Use the standardized organ name
         bloodGroup: values.bloodGroup,
         hlaMatch: values.hlaMatch,
         tissueType: values.tissueType,
@@ -137,10 +149,13 @@ export default function DonorRegistration() {
 
       // Update the organ count in the pledges collection
       const pledgeRef = doc(db, "hospitals", user?.uid || "", "pledges", selectedDonor.id)
-      const organCount = selectedDonor.organs[values.organ]
+      
+      // Convert the standardized organ name to lowercase for accessing the organs object
+      const organKey = standardizedOrgan.toLowerCase();
+      const organCount = selectedDonor.organs[organKey]
       const updatedOrgans = {
         ...selectedDonor.organs,
-        [values.organ]: organCount - 1
+        [organKey]: organCount - 1
       }
 
       // Check if all organs are now 0
@@ -154,7 +169,7 @@ export default function DonorRegistration() {
       } else {
         // Otherwise, just update the organ count
         await updateDoc(pledgeRef, {
-          [`organs.${values.organ}`]: organCount - 1
+          [`organs.${organKey}`]: organCount - 1
         })
         // Update local state
         setDonors(prev => prev.map(d => 
@@ -258,11 +273,18 @@ export default function DonorRegistration() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {availableOrgans.map((organ) => (
-                          <SelectItem key={organ} value={organ}>
-                            {organ.charAt(0).toUpperCase() + organ.slice(1)}
-                          </SelectItem>
-                        ))}
+                        {availableOrgans.map((organKey) => {
+                          // Map the lowercase organ key to the proper case format
+                          const organName = ORGAN_NAMES.find(name => 
+                            name.toLowerCase() === organKey.toLowerCase()
+                          ) || organKey.charAt(0).toUpperCase() + organKey.slice(1);
+                          
+                          return (
+                            <SelectItem key={organKey} value={organName}>
+                              {organName}
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -313,17 +335,21 @@ export default function DonorRegistration() {
                 name="hlaMatch"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Select HLA Match</FormLabel>
-                    <Select onValueChange={(value) => field.onChange(value)}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select an HLA match" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {/* Add HLA match options here */}
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>HLA Match</FormLabel>
+                    <FormControl>
+                      <Input 
+                        {...field}
+                        type="text"
+                        pattern="[0-9]*"
+                        inputMode="numeric"
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^0-9]/g, '');
+                          field.onChange(value);
+                        }}
+                        placeholder="Enter HLA match value (numbers only)"
+                        className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -333,17 +359,21 @@ export default function DonorRegistration() {
                 name="tissueType"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Select Tissue Type</FormLabel>
-                    <Select onValueChange={(value) => field.onChange(value)}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a tissue type" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {/* Add tissue type options here */}
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>Tissue Type</FormLabel>
+                    <FormControl>
+                      <Input 
+                        {...field}
+                        type="text"
+                        pattern="[0-9]*"
+                        inputMode="numeric"
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^0-9]/g, '');
+                          field.onChange(value);
+                        }}
+                        placeholder="Enter tissue type value (numbers only)"
+                        className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

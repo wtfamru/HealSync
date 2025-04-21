@@ -23,6 +23,9 @@ import { Switch } from "@/components/ui/switch"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { DatePickerField } from "@/components/ui/date-picker-field"
 
+// Use this exact format for organ names as required by the contract
+const ORGAN_NAMES = ["Heart", "Lung", "Liver", "Kidney", "Pancreas", "Eyes"];
+
 const formSchema = z.object({
   gender: z.enum(["male", "female", "other"], {
     required_error: "Please select your gender.",
@@ -201,6 +204,7 @@ export default function DonorRegistrationForm() {
         return;
       }
 
+      // Ensure proper capitalization for organs
       // Structure the pledge data
       const pledgeData = {
         // Basic donor information
@@ -212,8 +216,9 @@ export default function DonorRegistrationForm() {
         weight: values.weight,
         height: values.height,
         
-        // Organ donation preferences
+        // Organ donation preferences with standardized capitalization
         organs: {
+          // Use lowercase for database storage, will be standardized when registering
           kidney: parseInt(values.kidney),
           eyes: parseInt(values.eyes),
           liver: values.liver ? 1 : 0,
@@ -782,12 +787,16 @@ export default function DonorRegistrationForm() {
                       <FormLabel className="text-gray-600">Weight (kg)</FormLabel>
                       <FormControl>
                         <Input
-                          type="number"
-                          min="0"
-                          step="0.1"
+                          type="text"
+                          pattern="[0-9]*\.?[0-9]*"
+                          inputMode="decimal"
                           placeholder="Enter weight in kg"
                           {...field}
-                          className="border-gray-400 focus:border-[#5AA7A7] focus:ring-[#5AA7A7]"
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/[^0-9.]/g, '');
+                            field.onChange(value);
+                          }}
+                          className="border-gray-400 focus:border-[#5AA7A7] focus:ring-[#5AA7A7] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                       </FormControl>
                       <FormMessage />
@@ -802,12 +811,16 @@ export default function DonorRegistrationForm() {
                       <FormLabel className="text-gray-600">Height (cm)</FormLabel>
                       <FormControl>
                         <Input
-                          type="number"
-                          min="0"
-                          step="0.1"
+                          type="text"
+                          pattern="[0-9]*\.?[0-9]*"
+                          inputMode="decimal"
                           placeholder="Enter height in cm"
                           {...field}
-                          className="border-gray-400 focus:border-[#5AA7A7] focus:ring-[#5AA7A7]"
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/[^0-9.]/g, '');
+                            field.onChange(value);
+                          }}
+                          className="border-gray-400 focus:border-[#5AA7A7] focus:ring-[#5AA7A7] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                       </FormControl>
                       <FormMessage />
