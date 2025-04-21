@@ -59,6 +59,10 @@ import DonorRegistration from "./donor-registration"
 import { cn } from "@/lib/utils"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command"
+import { ConnectButton } from "thirdweb/react"
+import { sepolia } from "thirdweb/chains"
+import { client } from "@/providers/thirdweb-provider"
+import { CONTRACT_CONFIG } from "@/config/contract"
 
 const formSchema = z.object({
   donorId: z.string().min(1, "Please select a donor"),
@@ -1234,10 +1238,20 @@ export default function Dashboard() {
           </SidebarContent>
 
           <SidebarFooter>
-            <Button className="w-full mb-4 bg-[#5AA7A7] hover:bg-[#4A9696] text-white cursor-pointer" size="sm">
-              <Wallet className="mr-2 h-4 w-4" />
-              Connect Wallet
-            </Button>
+            <div className="flex flex-col gap-2">
+              <ConnectButton
+                client={client}
+                connectButton={{
+                  label: "Connect Wallet",
+                  className: "w-full mb-4 bg-[#5AA7A7] hover:bg-[#4A9696] text-white cursor-pointer",
+                }}
+                connectModal={{
+                  title: "Connect to HealSync",
+                  titleIcon: "/logo.png",
+                  size: "compact"
+                }}
+              />
+            </div>
 
             <SidebarSeparator />
 
