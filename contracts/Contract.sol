@@ -15,7 +15,7 @@ contract OrganTransplant is Ownable {
         string bloodGroup;
         string organ;
         string ipfsHash;
-        string tissueType;
+        uint256 tissueType;
         uint256 hlaMatch;
     }
 
@@ -223,12 +223,19 @@ contract OrganTransplant is Ownable {
         return 0;
     }
 
-    function isCompatible(Donor storage donor, Recipient storage recipient) private view returns (bool) {
-        return (keccak256(abi.encodePacked(donor.medical.organ)) == keccak256(abi.encodePacked(recipient.medical.organ)) &&
-               keccak256(abi.encodePacked(donor.medical.bloodGroup)) == keccak256(abi.encodePacked(recipient.medical.bloodGroup)) &&
-               donor.medical.tissueType == recipient.medical.tissueType &&
-               donor.medical.hlaMatch == recipient.medical.hlaMatch);
-    }
+   function isCompatible(Donor storage donor, Recipient storage recipient) private view returns (bool) {
+    // Basic compatibility checks
+    bool organMatch = keccak256(abi.encodePacked(donor.medical.organ)) == keccak256(abi.encodePacked(recipient.medical.organ));
+    bool bloodMatch = keccak256(abi.encodePacked(donor.medical.bloodGroup)) == keccak256(abi.encodePacked(recipient.medical.bloodGroup));
+    bool tissueMatch = donor.medical.tissueType == recipient.medical.tissueType;
+    
+    // HLA matching - more flexible than exact match
+    // In real transplants, HLA matching is complex, but we'll implement a basic threshold
+    // Let's say at least 50% match is required (assuming hlaMatch is a percentage 0-100)
+    bool hlaCompatible = donor.medical.hlaMatch >= 50 && recipient.medical.hlaMatch >= 50;
+    
+    return organMatch && bloodMatch && tissueMatch && hlaCompatible;
+}
 
     function performTransplant(uint256 donorId, uint256 recipientId) private {
         donors[donorId].isAvailable = false;
@@ -236,5 +243,8 @@ contract OrganTransplant is Ownable {
         emit TransplantSuccessful(donorId, recipientId);
     }
     
-    function renounceOwnership() public pure override {}
+    function renounceOwnership() public view override onlyOwner {
+    // Disable renouncing ownership
+    revert("Ownership cannot be renounced");
+}
 }

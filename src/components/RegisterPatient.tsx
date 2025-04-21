@@ -17,6 +17,7 @@ import { getContract, prepareContractCall, sendTransaction } from "thirdweb"
 import { sepolia } from "thirdweb/chains"
 import { useActiveAccount } from "thirdweb/react"
 import { toast } from "sonner"
+import { Search, FileCheck } from "lucide-react"
 
 const bloodGroups = ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"]
 const organs = ["Heart", "Lung", "Liver", "Kidney", "Pancreas", "Eyes"]
@@ -42,6 +43,16 @@ const urgencyPriorityMap: { [key: string]: bigint } = {
   Critical: 3n,
 };
 
+// Sample IPFS medical reports (in a real app, these would come from a database or API)
+const sampleMedicalReports = [
+  { hash: "QmX7BZye6LkUvJ1YK3Cx9yYmN9xY7Ri6JJvMKr8QXY9T5A", name: "Heart Examination Report" },
+  { hash: "QmYDw9JjbXvHiRC4zFj5g5xrFEEKqgm5rA8PcBgn4rCG2U", name: "Kidney Function Test" },
+  { hash: "QmZ9BtRbVKBFMdMLvSJg7LcY1jEkZEVNKtJfEdz3CKqg7K", name: "Liver Medical Report" },
+  { hash: "QmUNLLsPACCz1vLxQVkXqqLX5R1X345qqfHbsf67hvA3Nn", name: "Lung Assessment" },
+  { hash: "QmPK1s3pNYLi9ERiq3BDxKa4XosgWwFRQUydHUtz4YgpqB", name: "Pancreas Evaluation" },
+  { hash: "QmR6jXApLMbuJ9YLWyiifLQKgMAvCrTdmncxPGyBQGtZ9h", name: "Eye Examination" },
+]
+
 export default function RegisterPatient() {
   const [formData, setFormData] = useState<PatientFormData>({
     name: "",
@@ -56,12 +67,29 @@ export default function RegisterPatient() {
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const account = useActiveAccount()
+  const [searchTerm, setSearchTerm] = useState("")
 
   const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
 
   if (!CONTRACT_ADDRESS) {
     console.error("Contract address is missing from environment variables.");
     // Optionally return an error message component or throw an error
+  }
+
+  // Filter medical reports based on search term
+  const filteredMedicalReports = sampleMedicalReports.filter(report => 
+    report.name.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
+  // Replace sample IPFS hashes with gateway URLs for easier viewing
+  const ipfsGateway = "https://ipfs.io/ipfs/"
+
+  // Helper function to view the medical report
+  const viewMedicalReport = (hash: string) => {
+    if (!hash || hash === "custom") return
+    
+    const url = `${ipfsGateway}${hash}`
+    window.open(url, '_blank')
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -185,7 +213,7 @@ export default function RegisterPatient() {
               <div className="space-y-1">
                 <Label htmlFor="gender">Gender</Label>
                 <Select value={formData.gender} onValueChange={(value) => handleSelectChange("gender", value)} required>
-                  <SelectTrigger id="gender">
+                  <SelectTrigger id="gender" className="cursor-pointer">
                     <SelectValue placeholder="Select gender" />
                   </SelectTrigger>
                   <SelectContent>
@@ -201,7 +229,7 @@ export default function RegisterPatient() {
               <div className="space-y-1">
                 <Label htmlFor="bloodGroup">Blood Group</Label>
                 <Select value={formData.bloodGroup} onValueChange={(value) => handleSelectChange("bloodGroup", value)}>
-                  <SelectTrigger id="bloodGroup">
+                  <SelectTrigger id="bloodGroup" className="cursor-pointer">
                     <SelectValue placeholder="Select blood group" />
                   </SelectTrigger>
                   <SelectContent>
@@ -217,7 +245,7 @@ export default function RegisterPatient() {
               <div className="space-y-1">
                 <Label htmlFor="organ">Organ</Label>
                 <Select value={formData.organ} onValueChange={(value) => handleSelectChange("organ", value)}>
-                  <SelectTrigger id="organ">
+                  <SelectTrigger id="organ" className="cursor-pointer">
                     <SelectValue placeholder="Select organ" />
                   </SelectTrigger>
                   <SelectContent>
@@ -234,18 +262,72 @@ export default function RegisterPatient() {
             <div className="space-y-4">
               <div className="space-y-1">
                 <Label htmlFor="ipfsHash">Medical Report IPFS Hash</Label>
-                <Input id="ipfsHash" value={formData.ipfsHash} onChange={handleChange} required placeholder="Enter IPFS hash..." />
+                <div className="space-y-2">
+                  <div className="relative">
+                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
+                    <Input
+                      placeholder="Search medical reports..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-8 mb-2"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Select 
+                      value={formData.ipfsHash} 
+                      onValueChange={(value) => handleSelectChange("ipfsHash", value)}
+                      className="flex-1"
+                    >
+                      <SelectTrigger id="ipfsHash" className="cursor-pointer">
+                        <SelectValue placeholder="Select medical report" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {filteredMedicalReports.map((report) => (
+                          <SelectItem key={report.hash} value={report.hash}>
+                            {report.name} ({report.hash.slice(0, 6)}...{report.hash.slice(-4)})
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="custom">Custom IPFS Hash</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {formData.ipfsHash && formData.ipfsHash !== "custom" && (
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="icon" 
+                        onClick={() => viewMedicalReport(formData.ipfsHash)}
+                        className="cursor-pointer"
+                      >
+                        <FileCheck className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                  {formData.ipfsHash === "custom" && (
+                    <Input
+                      id="customIpfsHash"
+                      value={formData.ipfsHash === "custom" ? "" : formData.ipfsHash}
+                      onChange={(e) => setFormData(prev => ({ ...prev, ipfsHash: e.target.value }))}
+                      placeholder="Enter custom IPFS hash..."
+                      className="mt-2"
+                    />
+                  )}
+                </div>
               </div>
 
               <div className="space-y-1">
                 <Label htmlFor="tissueType">Tissue Type</Label>
                 <Input
                   id="tissueType"
-                  type="number"
-                  min="0"
+                  type="text"
+                  pattern="[0-9]*"
+                  inputMode="numeric"
                   value={formData.tissueType}
-                  onChange={handleChange}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9]/g, '');
+                    setFormData((prev) => ({ ...prev, tissueType: value }));
+                  }}
                   required
+                  placeholder="Enter positive number only"
                   className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
               </div>
@@ -254,11 +336,16 @@ export default function RegisterPatient() {
                 <Label htmlFor="hlaMatch">HLA Match</Label>
                 <Input
                   id="hlaMatch"
-                  type="number"
-                  min="0"
+                  type="text"
+                  pattern="[0-9]*"
+                  inputMode="numeric"
                   value={formData.hlaMatch}
-                  onChange={handleChange}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9]/g, '');
+                    setFormData((prev) => ({ ...prev, hlaMatch: value }));
+                  }}
                   required
+                  placeholder="Enter positive number only"
                   className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
               </div>
@@ -266,7 +353,7 @@ export default function RegisterPatient() {
               <div className="space-y-1">
                 <Label htmlFor="urgency">Urgency Level</Label>
                 <Select value={formData.urgency} onValueChange={(value) => handleSelectChange("urgency", value)}>
-                  <SelectTrigger id="urgency">
+                  <SelectTrigger id="urgency" className="cursor-pointer">
                     <SelectValue placeholder="Select urgency level" />
                   </SelectTrigger>
                   <SelectContent>
@@ -284,7 +371,7 @@ export default function RegisterPatient() {
           <Button
             type="submit"
             disabled={isSubmitting || !account}
-            className="w-full bg-[#5AA7A7] hover:bg-[#4A9696] mt-4 disabled:opacity-50"
+            className="w-full bg-[#5AA7A7] hover:bg-[#4A9696] mt-4 disabled:opacity-50 cursor-pointer"
           >
             {isSubmitting ? "Registering..." : (account ? "Register Patient" : "Connect Wallet to Register")}
           </Button>

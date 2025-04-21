@@ -27,6 +27,11 @@ import {
   HeartPulse,
   ChevronsUpDown,
   Check,
+  Trash,
+  Upload,
+  CheckCircle2,
+  XCircle,
+  ExternalLink
 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
@@ -62,14 +67,17 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "
 import { ConnectButton } from "thirdweb/react"
 import { sepolia } from "thirdweb/chains"
 import { client } from "@/providers/thirdweb-provider"
-import { CONTRACT_CONFIG } from "@/config/contract"
 
 const formSchema = z.object({
   donorId: z.string().min(1, "Please select a donor"),
   organ: z.string().min(1, "Please select an organ"),
   bloodGroup: z.string(),
-  hlaMatch: z.string().min(1, "HLA match is required"),
-  tissueType: z.string().min(1, "Tissue type is required"),
+  hlaMatch: z.string().refine(val => /^\d+$/.test(val), {
+    message: "HLA match must be a number",
+  }),
+  tissueType: z.string().refine(val => /^\d+$/.test(val), {
+    message: "Tissue type must be a number",
+  }),
   age: z.string(),
   gender: z.string(),
 })
@@ -113,6 +121,9 @@ interface RegisteredDonor {
   registeredAt: string;
   verifiedAt?: string;
 }
+
+// Define the exact organ names as required by the contract
+const ORGAN_NAMES = ["Heart", "Lung", "Liver", "Kidney", "Pancreas", "Eyes"];
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("dashboard")
@@ -280,11 +291,16 @@ export default function Dashboard() {
     if (!selectedDonor) return
 
     try {
+      // Ensure the organ name is in the proper case format
+      const standardizedOrgan = ORGAN_NAMES.find(
+        name => name.toLowerCase() === values.organ.toLowerCase()
+      ) || values.organ;
+
       const registeredRef = collection(db, "hospitals", user?.uid || "", "registered_donors")
       await addDoc(registeredRef, {
         donorId: selectedDonor.id,
         donorName: selectedDonor.name,
-        organ: values.organ,
+        organ: standardizedOrgan, // Use standardized organ name
         bloodGroup: values.bloodGroup,
         hlaMatch: values.hlaMatch,
         tissueType: values.tissueType,
@@ -297,10 +313,13 @@ export default function Dashboard() {
 
       // Update the organ count in the pledges collection
       const pledgeRef = doc(db, "hospitals", user?.uid || "", "pledges", selectedDonor.id)
-      const organCount = selectedDonor.organs[values.organ as keyof typeof selectedDonor.organs]
+      
+      // Convert the standardized organ name to lowercase for accessing the organs object
+      const organKey = standardizedOrgan.toLowerCase();
+      const organCount = selectedDonor.organs[organKey as keyof typeof selectedDonor.organs]
       const updatedOrgans = {
         ...selectedDonor.organs,
-        [values.organ]: organCount - 1
+        [organKey]: organCount - 1
       }
 
       // Check if all organs are now 0
@@ -314,7 +333,7 @@ export default function Dashboard() {
       } else {
         // Otherwise, just update the organ count
         await updateDoc(pledgeRef, {
-          [`organs.${values.organ}`]: organCount - 1
+          [`organs.${organKey}`]: organCount - 1
         })
         // Update local state for deceased donors
         setDeceasedDonors(prev => prev.map(d => 
@@ -432,24 +451,29 @@ export default function Dashboard() {
 
   const handleVerifyDonor = async (registeredId: string) => {
     try {
-      const registeredRef = doc(db, "hospitals", user?.uid || "", "registered_donors", registeredId)
-      await updateDoc(registeredRef, {
-        isVerified: true,
-        verifiedAt: new Date().toISOString()
-      })
+      // Get the donor data before deleting
+      const donorToVerify = registeredDonors.find(donor => donor.id === registeredId);
       
-      setRegisteredDonors(prev => prev.map(d => 
-        d.id === registeredId ? { 
-          ...d, 
-          isVerified: true, 
-          verifiedAt: new Date().toISOString()
-        } : d
-      ))
+      if (!donorToVerify) {
+        toast.error("Donor record not found");
+        return;
+      }
       
-      toast.success("Donor verified successfully")
+      // Here you would add code to store the donor on the blockchain
+      // This is a placeholder for the blockchain integration
+      toast.info("Preparing to register donor on blockchain...");
+      
+      // Delete the document from Firebase
+      const registeredRef = doc(db, "hospitals", user?.uid || "", "registered_donors", registeredId);
+      await deleteDoc(registeredRef);
+      
+      // Remove the donor from the local state
+      setRegisteredDonors(prev => prev.filter(d => d.id !== registeredId));
+      
+      toast.success("Donor verified and record moved to blockchain");
     } catch (error) {
-      console.error("Error verifying donor:", error)
-      toast.error("Failed to verify donor")
+      console.error("Error verifying donor:", error);
+      toast.error("Failed to verify donor");
     }
   }
 
@@ -473,6 +497,11 @@ export default function Dashboard() {
       toast.error("Failed to remove report")
     }
   }
+
+  // Add a helper function to view reports
+  const handleViewReport = (reportUrl: string) => {
+    window.open(reportUrl, '_blank');
+  };
 
   const renderContent = () => {
     switch (activeTab) {
@@ -767,11 +796,18 @@ export default function Dashboard() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {availableOrgans.map((organ) => (
-                                <SelectItem key={organ} value={organ} className="cursor-pointer">
-                                  {organ}
-                                </SelectItem>
-                              ))}
+                              {availableOrgans.map((organKey) => {
+                                // Map the lowercase organ key to the proper case format
+                                const organName = ORGAN_NAMES.find(name => 
+                                  name.toLowerCase() === organKey.toLowerCase()
+                                ) || organKey;
+                                
+                                return (
+                                  <SelectItem key={organKey} value={organName} className="cursor-pointer">
+                                    {organName}
+                                  </SelectItem>
+                                );
+                              })}
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -824,7 +860,18 @@ export default function Dashboard() {
                         <FormItem>
                           <FormLabel>HLA Match</FormLabel>
                           <FormControl>
-                            <Input {...field} placeholder="Enter HLA match details" />
+                            <Input 
+                              {...field} 
+                              placeholder="Enter HLA match value (numbers only)" 
+                              type="text"
+                              pattern="[0-9]*"
+                              inputMode="numeric"
+                              onChange={(e) => {
+                                const value = e.target.value.replace(/[^0-9]/g, '');
+                                field.onChange(value);
+                              }}
+                              className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -837,7 +884,18 @@ export default function Dashboard() {
                         <FormItem>
                           <FormLabel>Tissue Type</FormLabel>
                           <FormControl>
-                            <Input {...field} placeholder="Enter tissue type" />
+                            <Input 
+                              {...field} 
+                              placeholder="Enter tissue type value (numbers only)" 
+                              type="text"
+                              pattern="[0-9]*"
+                              inputMode="numeric"
+                              onChange={(e) => {
+                                const value = e.target.value.replace(/[^0-9]/g, '');
+                                field.onChange(value);
+                              }}
+                              className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -953,61 +1011,17 @@ export default function Dashboard() {
                         </div>
                         <div className="flex gap-2">
                           {!registered.isVerified ? (
-                            <div className="flex gap-2 items-center">
-                              {!registered.reportPdfUrl ? (
-                                <div className="flex gap-2 flex-1">
-                                  <Input
-                                    type="file"
-                                    accept=".pdf"
-                                    onChange={(e) => {
-                                      const file = e.target.files?.[0]
-                                      if (file) {
-                                        handleUploadReport(registered.id, file)
-                                      }
-                                    }}
-                                    className="flex-1"
-                                  />
-                                </div>
-                              ) : (
-                                <>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => window.open(registered.reportPdfUrl, '_blank')}
-                                  >
-                                    <FileCheck className="h-4 w-4 mr-2" />
-                                    View Report
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="destructive"
-                                    size="sm"
-                                    onClick={() => handleRemovePdf(registered.id)}
-                                  >
-                                    Remove PDF
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="default"
-                                    size="sm"
-                                    onClick={() => handleVerifyDonor(registered.id)}
-                                  >
-                                    Verify Donor
-                                  </Button>
-                                </>
-                              )}
-                            </div>
-                          ) : (
                             <Button
                               type="button"
-                              variant="outline"
+                              variant="default"
                               size="sm"
-                              onClick={() => window.open(registered.reportPdfUrl, '_blank')}
+                              onClick={() => handleVerifyDonor(registered.id)}
+                              className="cursor-pointer"
                             >
-                              <FileCheck className="h-4 w-4 mr-2" />
-                              View Report
+                              Verify Donor
                             </Button>
+                          ) : (
+                            <span className="text-sm text-green-600">Verification complete</span>
                           )}
                         </div>
                       </div>
