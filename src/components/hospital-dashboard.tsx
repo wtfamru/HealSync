@@ -75,9 +75,7 @@ const formSchema = z.object({
   hlaMatch: z.string().refine(val => /^\d+$/.test(val), {
     message: "HLA match must be a number",
   }),
-  tissueType: z.string().refine(val => /^\d+$/.test(val), {
-    message: "Tissue type must be a number",
-  }),
+  tissueType: z.string(),
   age: z.string(),
   gender: z.string(),
 })
@@ -886,14 +884,8 @@ export default function Dashboard() {
                           <FormControl>
                             <Input 
                               {...field} 
-                              placeholder="Enter tissue type value (numbers only)" 
+                              placeholder="Enter tissue type" 
                               type="text"
-                              pattern="[0-9]*"
-                              inputMode="numeric"
-                              onChange={(e) => {
-                                const value = e.target.value.replace(/[^0-9]/g, '');
-                                field.onChange(value);
-                              }}
                               className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             />
                           </FormControl>
@@ -1060,10 +1052,10 @@ export default function Dashboard() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowConfirmDialog(false)}>
+            <Button variant="outline" onClick={() => setShowConfirmDialog(false)} className="cursor-pointer">
               Cancel
             </Button>
-            <Button variant="default" onClick={handleMarkDeceased}>
+            <Button variant="default" onClick={handleMarkDeceased} className="cursor-pointer">
               Confirm
             </Button>
           </DialogFooter>
