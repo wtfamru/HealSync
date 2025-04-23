@@ -14,8 +14,7 @@ contract OrganTransplant is Ownable {
     struct MedicalInfo {
         string bloodGroup;
         string organ;
-        string ipfsHash;
-        uint256 tissueType;
+        string tissueType;
         uint256 hlaMatch;
     }
 
@@ -25,7 +24,6 @@ contract OrganTransplant is Ownable {
         string gender;
         uint256 age;
         MedicalInfo medical;
-        bool isApproved;
         bool isAvailable;
     }
 
@@ -35,25 +33,37 @@ contract OrganTransplant is Ownable {
         string gender;
         uint256 age;
         MedicalInfo medical;
-        uint256 priority;
-        bool isApproved;
+        string urgency; // "Low", "Medium", "High", "Critical"
         bool isWaiting;
         uint256 waitingTime;
+    }
+
+    struct Transplant {
+        uint256 donorId;
+        uint256 recipientId;
+        uint256 timestamp;
+    }
+
+    struct MatchResult {
+        bool success;
+        uint256 donorId;
+        uint256 recipientId;
+        string message;
     }
 
     mapping(uint256 => Hospital) public hospitals;
     mapping(uint256 => Donor) public donors;
     mapping(uint256 => Recipient) public recipients;
+    Transplant[] public transplants;
     uint256 public hospitalCounter;
     uint256 public donorCounter;
     uint256 public recipientCounter;
 
     event HospitalRegistered(uint256 indexed hospitalId, string name);
     event DonorRegistered(uint256 indexed donorId, string name);
-    event DonorApproved(uint256 indexed donorId);
     event RecipientRegistered(uint256 indexed recipientId, string name);
-    event RecipientApproved(uint256 indexed recipientId);
-    event TransplantSuccessful(uint256 indexed donorId, uint256 indexed recipientId);
+    event TransplantSuccessful(uint256 indexed donorId, uint256 indexed recipientId, uint256 timestamp);
+    event MatchAttempt(uint256 indexed recipientId, bool success, string message);
 
     function registerHospital(string memory _name) public {
         require(bytes(_name).length > 0, "Hospital name cannot be empty");
@@ -70,7 +80,7 @@ contract OrganTransplant is Ownable {
             }
         }
         return false;
-    } 
+    }
 
     function validateBloodGroup(string memory _bloodGroup) internal pure returns (bool) {
         string[8] memory validBloodGroups = ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"];
@@ -82,22 +92,28 @@ contract OrganTransplant is Ownable {
         return false;
     }
 
+    function validateUrgency(string memory _urgency) internal pure returns (bool) {
+        bytes32 urgencyHash = keccak256(abi.encodePacked(_urgency));
+        return (urgencyHash == keccak256(abi.encodePacked("Low"))) ||
+               (urgencyHash == keccak256(abi.encodePacked("Medium"))) ||
+               (urgencyHash == keccak256(abi.encodePacked("High"))) ||
+               (urgencyHash == keccak256(abi.encodePacked("Critical")));
+    }
+
     function registerDonor(
         string memory _name,
         string memory _gender,
         uint256 _age,
         string memory _bloodGroup,
         string memory _organ,
-        string memory _ipfsHash,
-        uint256 _tissueType,
+        string memory _tissueType,
         uint256 _hlaMatch
     ) public {
         require(bytes(_name).length > 0, "Name cannot be empty");
         require(_age > 0, "Age must be greater than zero");
         require(validateBloodGroup(_bloodGroup), "Invalid blood group");
         require(validateOrgan(_organ), "Invalid organ type");
-        require(bytes(_ipfsHash).length > 0, "IPFS hash cannot be empty");
-        require(_tissueType > 0, "Tissue type must be greater than zero");
+        require(bytes(_tissueType).length > 0, "Tissue type cannot be empty");
         require(_hlaMatch > 0, "HLA match must be greater than zero");
         
         donorCounter++;
@@ -109,11 +125,9 @@ contract OrganTransplant is Ownable {
             medical: MedicalInfo({
                 bloodGroup: _bloodGroup,
                 organ: _organ,
-                ipfsHash: _ipfsHash,
                 tissueType: _tissueType,
                 hlaMatch: _hlaMatch
             }),
-            isApproved: false,
             isAvailable: true
         });
         emit DonorRegistered(donorCounter, _name);
@@ -125,18 +139,16 @@ contract OrganTransplant is Ownable {
         uint256 _age,
         string memory _bloodGroup,
         string memory _organ,
-        string memory _ipfsHash,
-        uint256 _priority,
-        uint256 _tissueType,
+        string memory _urgency,
+        string memory _tissueType,
         uint256 _hlaMatch
     ) public {
         require(bytes(_name).length > 0, "Name cannot be empty");
         require(_age > 0, "Age must be greater than zero");
         require(validateBloodGroup(_bloodGroup), "Invalid blood group");
         require(validateOrgan(_organ), "Invalid organ type");
-        require(bytes(_ipfsHash).length > 0, "IPFS hash cannot be empty");
-        require(_priority >= 0, "Priority must be zero or positive");
-        require(_tissueType > 0, "Tissue type must be greater than zero");
+        require(validateUrgency(_urgency), "Invalid urgency level");
+        require(bytes(_tissueType).length > 0, "Tissue type cannot be empty");
         require(_hlaMatch > 0, "HLA match must be greater than zero");
         
         recipientCounter++;
@@ -149,102 +161,102 @@ contract OrganTransplant is Ownable {
             medical: MedicalInfo({
                 bloodGroup: _bloodGroup,
                 organ: _organ,
-                ipfsHash: _ipfsHash,
                 tissueType: _tissueType,
                 hlaMatch: _hlaMatch
             }),
-            priority: _priority,
-            isApproved: false,
+            urgency: _urgency,
             isWaiting: true,
             waitingTime: block.timestamp
         });
         emit RecipientRegistered(recipientCounter, _name);
     }
 
-    function approveDonor(uint256 _donorId) public onlyOwner {
-        require(_donorId > 0 && _donorId <= donorCounter, "Invalid donor ID");
-        require(!donors[_donorId].isApproved, "Donor is already approved");
-        
-        donors[_donorId].isApproved = true;
-        emit DonorApproved(_donorId);
-    }
-
-    function approveRecipient(uint256 _recipientId) public onlyOwner {
-        require(_recipientId > 0 && _recipientId <= recipientCounter, "Invalid recipient ID");
-        require(!recipients[_recipientId].isApproved, "Recipient is already approved");
-        
-        recipients[_recipientId].isApproved = true;
-        emit RecipientApproved(_recipientId);
-    }
-
-    function matchRecipient() public {
-        uint256 bestRecipient = findBestRecipient();
-        
-        if (bestRecipient != 0) {
-            uint256 bestDonor = findBestDonor(bestRecipient);
-            if (bestDonor != 0) {
-                performTransplant(bestDonor, bestRecipient);
-            }
-        }
-    }
-
-    function findBestRecipient() private view returns (uint256) {
+    function matchRecipient() public returns (MatchResult memory) {
         uint256 bestRecipient = 0;
-        uint256 bestPriority = 0;
+        uint256 highestUrgencyScore = 0;
         uint256 bestWaitingTime = 0;
 
+        // Find highest priority recipient
         for (uint256 r = 1; r <= recipientCounter; r++) {
-            Recipient storage recipient = recipients[r];
-            if (recipient.isApproved && recipient.isWaiting) {
-                uint256 currentWaiting = block.timestamp - recipient.waitingTime;
-                
-                if (recipient.priority > bestPriority || 
-                    (recipient.priority == bestPriority && currentWaiting > bestWaitingTime)) {
-                    bestPriority = recipient.priority;
-                    bestWaitingTime = currentWaiting;
+            if (recipients[r].isWaiting) {
+                uint256 recipientUrgencyScore = getUrgencyScore(recipients[r].urgency);
+                uint256 recipientWaitingTime = block.timestamp - recipients[r].waitingTime;
+
+                if (recipientUrgencyScore > highestUrgencyScore ||
+                    (recipientUrgencyScore == highestUrgencyScore && recipientWaitingTime > bestWaitingTime)) {
+                    highestUrgencyScore = recipientUrgencyScore;
+                    bestWaitingTime = recipientWaitingTime;
                     bestRecipient = r;
                 }
             }
         }
-        return bestRecipient;
-    }
 
-    function findBestDonor(uint256 recipientId) private view returns (uint256) {
-        Recipient storage recipient = recipients[recipientId];
-        
+        if (bestRecipient == 0) {
+            emit MatchAttempt(0, false, "No recipients waiting");
+            return MatchResult({
+                success: false,
+                donorId: 0,
+                recipientId: 0,
+                message: "No recipients waiting"
+            });
+        }
+
+        // Try to find compatible donor
         for (uint256 d = 1; d <= donorCounter; d++) {
-            Donor storage donor = donors[d];
-            if (donor.isApproved && donor.isAvailable) {
-                if (isCompatible(donor, recipient)) {
-                    return d;
-                }
+            if (donors[d].isAvailable && isCompatible(donors[d], recipients[bestRecipient])) {
+                donors[d].isAvailable = false;
+                recipients[bestRecipient].isWaiting = false;
+                
+                uint256 currentTime = block.timestamp;
+                transplants.push(Transplant({
+                    donorId: d,
+                    recipientId: bestRecipient,
+                    timestamp: currentTime
+                }));
+                
+                emit TransplantSuccessful(d, bestRecipient, currentTime);
+                emit MatchAttempt(bestRecipient, true, 
+                    string(abi.encodePacked("Matched with donor ", donors[d].name)));
+                
+                return MatchResult({
+                    success: true,
+                    donorId: d,
+                    recipientId: bestRecipient,
+                    message: string(abi.encodePacked("Successfully matched with donor ", donors[d].name))
+                });
             }
         }
+
+        emit MatchAttempt(bestRecipient, false, "No compatible donor available");
+        return MatchResult({
+            success: false,
+            donorId: 0,
+            recipientId: bestRecipient,
+            message: "No compatible donor available"
+        });
+    }
+
+    function getUrgencyScore(string memory _urgency) private pure returns (uint256) {
+        bytes32 urgencyHash = keccak256(abi.encodePacked(_urgency));
+        if (urgencyHash == keccak256(abi.encodePacked("Critical"))) return 4;
+        if (urgencyHash == keccak256(abi.encodePacked("High"))) return 3;
+        if (urgencyHash == keccak256(abi.encodePacked("Medium"))) return 2;
+        if (urgencyHash == keccak256(abi.encodePacked("Low"))) return 1;
         return 0;
     }
 
-   function isCompatible(Donor storage donor, Recipient storage recipient) private view returns (bool) {
-    // Basic compatibility checks
-    bool organMatch = keccak256(abi.encodePacked(donor.medical.organ)) == keccak256(abi.encodePacked(recipient.medical.organ));
-    bool bloodMatch = keccak256(abi.encodePacked(donor.medical.bloodGroup)) == keccak256(abi.encodePacked(recipient.medical.bloodGroup));
-    bool tissueMatch = donor.medical.tissueType == recipient.medical.tissueType;
-    
-    // HLA matching - more flexible than exact match
-    // In real transplants, HLA matching is complex, but we'll implement a basic threshold
-    // Let's say at least 50% match is required (assuming hlaMatch is a percentage 0-100)
-    bool hlaCompatible = donor.medical.hlaMatch >= 50 && recipient.medical.hlaMatch >= 50;
-    
-    return organMatch && bloodMatch && tissueMatch && hlaCompatible;
-}
-
-    function performTransplant(uint256 donorId, uint256 recipientId) private {
-        donors[donorId].isAvailable = false;
-        recipients[recipientId].isWaiting = false;
-        emit TransplantSuccessful(donorId, recipientId);
+    function isCompatible(Donor memory donor, Recipient memory recipient) private pure returns (bool) {
+        return keccak256(abi.encodePacked(donor.medical.organ)) == keccak256(abi.encodePacked(recipient.medical.organ)) &&
+               keccak256(abi.encodePacked(donor.medical.bloodGroup)) == keccak256(abi.encodePacked(recipient.medical.bloodGroup)) &&
+               keccak256(abi.encodePacked(donor.medical.tissueType)) == keccak256(abi.encodePacked(recipient.medical.tissueType)) &&
+               donor.medical.hlaMatch == recipient.medical.hlaMatch;
     }
-    
-    function renounceOwnership() public view override onlyOwner {
-    // Disable renouncing ownership
-    revert("Ownership cannot be renounced");
-}
+
+    function getTransplantRecords() public view returns (Transplant[] memory) {
+        return transplants;
+    }
+
+    function renounceOwnership() public pure override {
+        revert("Ownership cannot be renounced");
+    }
 }
