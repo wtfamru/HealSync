@@ -9,6 +9,7 @@ contract OrganTransplant is Ownable {
     struct Hospital {
         uint256 id;
         string name;
+        address adminAddress;
     }
 
     struct MedicalInfo {
@@ -44,6 +45,14 @@ contract OrganTransplant is Ownable {
         uint256 timestamp;
     }
 
+    struct ConfirmedTransplant {
+        uint256 donorId;
+        uint256 recipientId;
+        uint256 transplantTimestamp;
+        uint256 confirmationTimestamp;
+        string notes;
+    }
+
     struct MatchResult {
         bool success;
         uint256 donorId;
@@ -54,7 +63,11 @@ contract OrganTransplant is Ownable {
     mapping(uint256 => Hospital) public hospitals;
     mapping(uint256 => Donor) public donors;
     mapping(uint256 => Recipient) public recipients;
+    mapping(address => bool) public isHospitalAdmin;
+    
     Transplant[] public transplants;
+    ConfirmedTransplant[] public confirmedTransplants;
+    
     uint256 public hospitalCounter;
     uint256 public donorCounter;
     uint256 public recipientCounter;
@@ -63,15 +76,17 @@ contract OrganTransplant is Ownable {
     event DonorRegistered(uint256 indexed donorId, string name);
     event RecipientRegistered(uint256 indexed recipientId, string name);
     event TransplantSuccessful(uint256 indexed donorId, uint256 indexed recipientId, uint256 timestamp);
+    event TransplantConfirmed(uint256 indexed donorId, uint256 indexed recipientId);
     event MatchAttempt(uint256 indexed recipientId, bool success, string message);
 
-    function registerHospital(string memory _name) public {
+    function registerHospital(string memory _name, address _admin) public onlyOwner {
         require(bytes(_name).length > 0, "Hospital name cannot be empty");
         hospitalCounter++;
-        hospitals[hospitalCounter] = Hospital(hospitalCounter, _name);
+        hospitals[hospitalCounter] = Hospital(hospitalCounter, _name, _admin);
+        isHospitalAdmin[_admin] = true;
         emit HospitalRegistered(hospitalCounter, _name);
     }
-    
+
     function validateOrgan(string memory _organ) internal pure returns (bool) {
         string[6] memory validOrgans = ["Heart", "Lung", "Liver", "Kidney", "Pancreas", "Eyes"];
         for (uint i = 0; i < validOrgans.length; i++) {
@@ -236,6 +251,48 @@ contract OrganTransplant is Ownable {
         });
     }
 
+   function confirmTransplant(
+    uint256 _donorId,
+    uint256 _recipientId,
+    string memory _notes
+) public {
+    // 1. Check if this pair is already confirmed
+    for (uint i = 0; i < confirmedTransplants.length; i++) {
+        if (confirmedTransplants[i].donorId == _donorId && 
+            confirmedTransplants[i].recipientId == _recipientId) {
+            revert("Transplant already confirmed");
+        }
+    }
+
+    // 2. Rest of the logic (find/remove from `transplants`, push to `confirmedTransplants`)
+    bool transplantFound = false;
+    uint256 transplantTimestamp;
+    uint256 indexToRemove;
+
+    for (uint i = 0; i < transplants.length; i++) {
+        if (transplants[i].donorId == _donorId && transplants[i].recipientId == _recipientId) {
+            transplantFound = true;
+            transplantTimestamp = transplants[i].timestamp;
+            indexToRemove = i;
+            break;
+        }
+    }
+    require(transplantFound, "No matching transplant record found");
+
+    transplants[indexToRemove] = transplants[transplants.length - 1];
+    transplants.pop();
+
+    confirmedTransplants.push(ConfirmedTransplant({
+        donorId: _donorId,
+        recipientId: _recipientId,
+        transplantTimestamp: transplantTimestamp,
+        confirmationTimestamp: block.timestamp,
+        notes: _notes
+    }));
+
+    emit TransplantConfirmed(_donorId, _recipientId);
+}
+
     function getUrgencyScore(string memory _urgency) private pure returns (uint256) {
         bytes32 urgencyHash = keccak256(abi.encodePacked(_urgency));
         if (urgencyHash == keccak256(abi.encodePacked("Critical"))) return 4;
@@ -256,7 +313,12 @@ contract OrganTransplant is Ownable {
         return transplants;
     }
 
-    function renounceOwnership() public pure override {
-        revert("Ownership cannot be renounced");
-    }
+    function getConfirmedTransplants() public view returns (ConfirmedTransplant[] memory) {
+        return confirmedTransplants;
+    }
+
+    function renounceOwnership() public view override onlyOwner {
+    // Disable renouncing ownership
+    revert("Ownership cannot be renounced");
+    }
 }

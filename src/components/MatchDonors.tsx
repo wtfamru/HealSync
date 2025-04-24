@@ -20,6 +20,16 @@ import {
 import { Search, AlertCircle, CheckCircle, Calendar } from "lucide-react"
 import { toast } from "sonner"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 
 const bloodGroups = ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"]
 const organs = ["Heart", "Lung", "Liver", "Kidney", "Pancreas", "Eyes"]
@@ -59,6 +69,7 @@ interface Transplant {
   recipientId: string;
   timestamp: string;
   isCommitted?: boolean;
+  notes?: string;
 }
 
 interface MatchResult {
@@ -129,7 +140,7 @@ const mockRecipients: Record<string, Recipient> = {
   },
   "2": {
     id: "2",
-    name: "Sarah Williams",
+      name: "Sarah Williams",
     gender: "Female",
     age: "38",
     medical: {
@@ -138,7 +149,7 @@ const mockRecipients: Record<string, Recipient> = {
       tissueType: "Type2",
       hlaMatch: "5",
     },
-    urgency: "Critical",
+      urgency: "Critical",
     isWaiting: false,
     waitingTime: "2023-10-20",
   },
@@ -264,6 +275,9 @@ export default function MatchDonors() {
   const [recipients, setRecipients] = useState<Record<string, Recipient>>({})
   const [isConnected, setIsConnected] = useState(true) // Simulating connection to blockchain
   const [isCommitting, setIsCommitting] = useState<Record<string, boolean>>({})
+  const [commitDialogOpen, setCommitDialogOpen] = useState(false)
+  const [selectedTransplant, setSelectedTransplant] = useState<{index: number, transplant: Transplant} | null>(null)
+  const [transplantNotes, setTransplantNotes] = useState("")
 
   // Generate array of years from 2020 to current year
   const years = Array.from(
@@ -479,9 +493,20 @@ export default function MatchDonors() {
     }
   };
 
-  // New function to handle committing a transplant
-  const handleCommitTransplant = async (index: number, transplant: Transplant) => {
+  // Open commit dialog with the selected transplant
+  const openCommitDialog = (index: number, transplant: Transplant) => {
+    setSelectedTransplant({ index, transplant });
+    setTransplantNotes("");
+    setCommitDialogOpen(true);
+  };
+  
+  // New function to handle committing a transplant with notes
+  const handleCommitTransplant = async () => {
+    if (!selectedTransplant) return;
+    
+    const { index, transplant } = selectedTransplant;
     setIsCommitting(prev => ({ ...prev, [index]: true }));
+    setCommitDialogOpen(false);
     
     try {
       // Simulate blockchain transaction
@@ -489,7 +514,11 @@ export default function MatchDonors() {
       
       // Update transplant status
       const updatedTransplants = [...transplants];
-      updatedTransplants[index] = { ...transplant, isCommitted: true };
+      updatedTransplants[index] = { 
+        ...transplant, 
+        isCommitted: true,
+        notes: transplantNotes.trim() || "No additional notes" 
+      };
       setTransplants(updatedTransplants);
       
       toast.success("Transplant successfully committed to blockchain!");
@@ -498,6 +527,7 @@ export default function MatchDonors() {
       console.error("Error committing transplant:", error);
     } finally {
       setIsCommitting(prev => ({ ...prev, [index]: false }));
+      setSelectedTransplant(null);
     }
   };
 
@@ -555,7 +585,7 @@ export default function MatchDonors() {
   const getFilterControl = () => {
     switch (filterType) {
       case "organ":
-        return (
+  return (
           <Select value={selectedOrgan} onValueChange={setSelectedOrgan}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Select organ" />
@@ -725,22 +755,22 @@ export default function MatchDonors() {
             >
               {showCommitted ? "Hide Committed Matches" : "Show Committed Matches"}
             </Button>
-          </div>
+        </div>
 
-          <div className="rounded-md border w-full overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
+        <div className="rounded-md border w-full overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
                   <TableHead>Donor ID</TableHead>
                   <TableHead>Donor Name</TableHead>
                   <TableHead>Recipient ID</TableHead>
                   <TableHead>Recipient Name</TableHead>
-                  <TableHead>Organ</TableHead>
+                <TableHead>Organ</TableHead>
                   <TableHead>Transplant Date</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
                 {isLoading ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-8">Loading matching records...</TableCell>
@@ -758,24 +788,31 @@ export default function MatchDonors() {
                         <TableCell>{recipient?.name || "Unknown"}</TableCell>
                         <TableCell>{donor?.medical?.organ || "Unknown"}</TableCell>
                         <TableCell>{transplant.timestamp}</TableCell>
-                        <TableCell>
+                  <TableCell>
                           {transplant.isCommitted ? (
-                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
-                              Committed
-                            </span>
+                            <div className="flex flex-col gap-1">
+                              <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                                Committed
+                              </span>
+                              {transplant.notes && (
+                                <span className="text-xs text-gray-500">
+                                  Note: {transplant.notes}
+                                </span>
+                              )}
+                            </div>
                           ) : (
                             <Button 
-                              onClick={() => handleCommitTransplant(index, transplant)}
+                              onClick={() => openCommitDialog(index, transplant)}
                               disabled={isCommitting[index]}
                               variant="outline" 
                               size="sm"
                               className="cursor-pointer bg-[#5AA7A7] text-white hover:bg-[#4A9696]"
                             >
                               {isCommitting[index] ? "Committing..." : "Commit Transplant"}
-                            </Button>
+                    </Button>
                           )}
-                        </TableCell>
-                      </TableRow>
+                  </TableCell>
+                </TableRow>
                     );
                   })
                 ) : (
@@ -783,11 +820,69 @@ export default function MatchDonors() {
                     <TableCell colSpan={7} className="text-center py-8">No matching records found.</TableCell>
                   </TableRow>
                 )}
-              </TableBody>
-            </Table>
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+    </Card>
+
+    {/* Commit Transplant Dialog */}
+    <Dialog open={commitDialogOpen} onOpenChange={setCommitDialogOpen}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>Commit Transplant</DialogTitle>
+          <DialogDescription>
+            Add any notes or observations about this transplant match before committing it to the blockchain.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="donor" className="text-right">
+              Donor
+            </Label>
+            <div id="donor" className="col-span-3 font-medium">
+              {selectedTransplant && donors[selectedTransplant.transplant.donorId]?.name} (ID: {selectedTransplant?.transplant.donorId})
+            </div>
           </div>
-        </CardContent>
-      </Card>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="recipient" className="text-right">
+              Recipient
+            </Label>
+            <div id="recipient" className="col-span-3 font-medium">
+              {selectedTransplant && recipients[selectedTransplant.transplant.recipientId]?.name} (ID: {selectedTransplant?.transplant.recipientId})
+            </div>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="organ" className="text-right">
+              Organ
+            </Label>
+            <div id="organ" className="col-span-3">
+              {selectedTransplant && donors[selectedTransplant.transplant.donorId]?.medical?.organ}
+            </div>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="notes" className="text-right">
+              Notes
+            </Label>
+            <Textarea
+              id="notes"
+              placeholder="Enter any additional notes or observations about this transplant match..."
+              className="col-span-3"
+              value={transplantNotes}
+              onChange={(e) => setTransplantNotes(e.target.value)}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setCommitDialogOpen(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleCommitTransplant} className="bg-[#5AA7A7] hover:bg-[#4A9696]">
+            Commit Transplant
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
     </div>
   );
 } 
