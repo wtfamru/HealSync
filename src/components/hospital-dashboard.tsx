@@ -67,6 +67,9 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "
 import { ConnectButton } from "thirdweb/react"
 import { sepolia } from "thirdweb/chains"
 import { client } from "@/providers/thirdweb-provider"
+import { prepareContractCall } from "thirdweb"
+import { useSendTransaction } from "thirdweb/react"
+import { getContract } from "thirdweb"
 
 const formSchema = z.object({
   donorId: z.string().min(1, "Please select a donor"),
@@ -151,6 +154,15 @@ export default function Dashboard() {
       gender: "",
     },
   })
+
+  const { mutate: sendTransaction } = useSendTransaction();
+  const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "0x7cfb5aee97b742d10739780336054422c60626e7";
+
+  const contract = getContract({
+    client,
+    chain: sepolia,
+    address: CONTRACT_ADDRESS,
+  });
 
   useEffect(() => {
     fetchDeceasedDonors()
@@ -456,24 +468,39 @@ export default function Dashboard() {
         toast.error("Donor record not found");
         return;
       }
-      
-      // Here you would add code to store the donor on the blockchain
-      // This is a placeholder for the blockchain integration
-      toast.info("Preparing to register donor on blockchain...");
-      
-      // Delete the document from Firebase
+
+      // Prepare the blockchain transaction
+      const tx = prepareContractCall({
+        contract,
+        method: "function registerDonor(string _name, string _gender, uint256 _age, string _bloodGroup, string _organ, string _tissueType, uint256 _hlaMatch)",
+        params: [
+          donorToVerify.donorName,
+          donorToVerify.gender,
+          BigInt(donorToVerify.age),
+          donorToVerify.bloodGroup,
+          donorToVerify.organ,
+          donorToVerify.tissueType,
+          BigInt(donorToVerify.hlaMatch),
+        ],
+      });
+
+      // Send the transaction and wait for it to complete
+      await sendTransaction(tx);
+
+      // Only delete from Firebase after successful blockchain transaction
       const registeredRef = doc(db, "hospitals", user?.uid || "", "registered_donors", registeredId);
       await deleteDoc(registeredRef);
       
       // Remove the donor from the local state
       setRegisteredDonors(prev => prev.filter(d => d.id !== registeredId));
       
-      toast.success("Donor verified and record moved to blockchain");
-    } catch (error) {
+      toast.success("Donor verified and registered on blockchain!");
+    } catch (error: any) {
       console.error("Error verifying donor:", error);
-      toast.error("Failed to verify donor");
+      const message = error.reason || error.message || "An unknown error occurred during verification.";
+      toast.error(`Verification failed: ${message}`);
     }
-  }
+  };
 
   const handleRemovePdf = async (registeredId: string) => {
     try {
@@ -983,15 +1010,6 @@ export default function Dashboard() {
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
                           <h3 className="font-medium">{registered.donorName}</h3>
-                          {registered.isVerified ? (
-                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
-                              Verified
-                            </span>
-                          ) : (
-                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
-                              Pending Verification
-                            </span>
-                          )}
                         </div>
                         <div className="text-sm text-gray-500 space-y-1">
                           <p>Organ: {registered.organ}</p>
@@ -1002,19 +1020,15 @@ export default function Dashboard() {
                           <p>Tissue Type: {registered.tissueType}</p>
                         </div>
                         <div className="flex gap-2">
-                          {!registered.isVerified ? (
-                            <Button
-                              type="button"
-                              variant="default"
-                              size="sm"
-                              onClick={() => handleVerifyDonor(registered.id)}
-                              className="cursor-pointer"
-                            >
-                              Verify Donor
-                            </Button>
-                          ) : (
-                            <span className="text-sm text-green-600">Verification complete</span>
-                          )}
+                          <Button
+                            type="button"
+                            variant="default"
+                            size="sm"
+                            onClick={() => handleVerifyDonor(registered.id)}
+                            className="cursor-pointer"
+                          >
+                            Verify Donor
+                          </Button>
                         </div>
                       </div>
                     </div>

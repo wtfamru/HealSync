@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -21,9 +21,9 @@ import {
 } from "@/components/ui/select"
 import { Search } from "lucide-react"
 import { client } from "@/providers/thirdweb-provider"
-import { getContract, type SmartContract } from "thirdweb"
+import { getContract } from "thirdweb"
 import { sepolia } from "thirdweb/chains"
-import { useActiveAccount } from "thirdweb/react"
+import { useReadContract } from "thirdweb/react"
 import { toast } from "sonner"
 
 const bloodGroups = ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"]
@@ -51,69 +51,36 @@ export default function ViewPatients() {
   const [selectedBloodGroup, setSelectedBloodGroup] = useState("all")
   const [selectedOrgan, setSelectedOrgan] = useState("all")
   const [selectedUrgency, setSelectedUrgency] = useState("all")
-  const [patients, setPatients] = useState<Patient[]>([])
-  const [loading, setLoading] = useState(true)
-  const account = useActiveAccount()
 
   const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "0x7cfb5aee97b742d10739780336054422c60626e7";
 
-  useEffect(() => {
-    if (account) {
-      fetchPatients()
-    }
-  }, [account])
+  const contract = getContract({
+    client,
+    chain: sepolia,
+    address: CONTRACT_ADDRESS,
+  })
 
-  const fetchPatients = async () => {
-    if (!account) {
-      toast.error("Please connect your wallet first")
-      return
-    }
+  const { data: recipients, isPending } = useReadContract({
+    contract,
+    method: "function getAllWaitingRecipients() view returns ((uint256 id, string name, string gender, uint256 age, (string bloodGroup, string organ, string tissueType, uint256 hlaMatch) medical, string urgency, bool isWaiting, uint256 waitingTime)[])",
+    params: [],
+  })
 
-    try {
-      setLoading(true)
-      const contract = getContract({
-        client,
-        chain: sepolia,
-        address: CONTRACT_ADDRESS,
-      }) as SmartContract
-
-      // Get the recipient counter to know how many patients to fetch
-      const totalRecipients = await contract.read.recipientCounter()
-
-      const patientsList: Patient[] = []
-
-      // Fetch each recipient's data
-      for (let i = 1; i <= Number(totalRecipients); i++) {
-        const recipient = await contract.read.recipients([i])
-        
-        // Only add patients who are still waiting
-        if (recipient.isWaiting) {
-          patientsList.push({
-            id: recipient.id.toString(),
-            name: recipient.name,
-            gender: recipient.gender,
-            age: recipient.age.toString(),
-            medical: {
-              bloodGroup: recipient.medical.bloodGroup,
-              organ: recipient.medical.organ,
-              tissueType: recipient.medical.tissueType,
-              hlaMatch: recipient.medical.hlaMatch.toString(),
-            },
-            urgency: recipient.urgency,
-            isWaiting: recipient.isWaiting,
-            waitingTime: new Date(Number(recipient.waitingTime) * 1000).toISOString(),
-          })
-        }
-      }
-
-      setPatients(patientsList)
-    } catch (error) {
-      console.error("Error fetching patients:", error)
-      toast.error("Failed to load patients from blockchain")
-    } finally {
-      setLoading(false)
-    }
-  }
+  const patients: Patient[] = recipients ? recipients.map((recipient: any) => ({
+    id: recipient.id.toString(),
+    name: recipient.name,
+    gender: recipient.gender,
+    age: recipient.age.toString(),
+    medical: {
+      bloodGroup: recipient.medical.bloodGroup,
+      organ: recipient.medical.organ,
+      tissueType: recipient.medical.tissueType,
+      hlaMatch: recipient.medical.hlaMatch.toString(),
+    },
+    urgency: recipient.urgency,
+    isWaiting: recipient.isWaiting,
+    waitingTime: new Date(Number(recipient.waitingTime) * 1000).toISOString(),
+  })) : []
 
   const filteredPatients = patients.filter((patient) => {
     const matchesSearch = patient.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -138,7 +105,7 @@ export default function ViewPatients() {
     }
   }
 
-  if (loading) {
+  if (isPending) {
     return (
       <Card className="w-full">
         <CardHeader>
