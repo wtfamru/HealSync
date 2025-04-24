@@ -18,46 +18,28 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Search, Calendar, Database } from "lucide-react"
+import { client } from "@/providers/thirdweb-provider"
+import { getContract } from "thirdweb"
+import { sepolia } from "thirdweb/chains"
+import { useReadContract } from "thirdweb/react"
 
 const organs = ["Heart", "Lung", "Liver", "Kidney", "Pancreas", "Eyes"]
 
-// Sample data - replace with actual data from your backend
-const sampleRecords = [
-  {
-    id: 1,
-    recipient: {
-      id: "REC-001",
-      name: "Robert Johnson",
-      age: 45,
-      bloodGroup: "A+",
-    },
-    donor: {
-      id: "DON-001",
-      name: "John Doe",
-      age: 32,
-      bloodGroup: "A+",
-    },
-    organ: "Kidney",
-    transplantDate: "2024-03-15",
-  },
-  {
-    id: 2,
-    recipient: {
-      id: "REC-002",
-      name: "Sarah Williams",
-      age: 38,
-      bloodGroup: "O-",
-    },
-    donor: {
-      id: "DON-002",
-      name: "Jane Smith",
-      age: 28,
-      bloodGroup: "O-",
-    },
-    organ: "Liver",
-    transplantDate: "2024-02-20",
-  },
-]
+interface TransplantRecord {
+  id: string;
+  donor: {
+    id: string;
+    name: string;
+  };
+  recipient: {
+    id: string;
+    name: string;
+  };
+  organ: string;
+  transplantDate: string;
+  confirmationDate: string;
+  notes: string;
+}
 
 type FilterType = "none" | "organ" | "date" | "year";
 type SearchByType = "donorName" | "donorId" | "recipientName" | "recipientId";
@@ -71,6 +53,59 @@ export default function TransplantRecords() {
   const [selectedYear, setSelectedYear] = useState("")
   const [selectedMonth, setSelectedMonth] = useState("")
   const [showMonthFilter, setShowMonthFilter] = useState(false)
+
+  const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "0x7cfb5aee97b742d10739780336054422c60626e7";
+
+  const contract = getContract({
+    client,
+    chain: sepolia,
+    address: CONTRACT_ADDRESS,
+  })
+
+  // Fetch confirmed transplant records from blockchain
+  const { data: transplantRecords, isPending } = useReadContract({
+    contract,
+    method: "function getConfirmedTransplants() view returns ((uint256 donorId, string donorName, uint256 recipientId, string recipientName, string organ, uint256 transplantTimestamp, uint256 confirmationTimestamp, string notes)[])",
+    params: [],
+  })
+
+  // Format ID with proper prefix and padding
+  const formatId = (id: bigint, prefix: string): string => {
+    try {
+      return `${prefix}${id.toString().padStart(6, '0')}`;
+    } catch (error) {
+      console.error("Error formatting ID:", error);
+      return "Invalid ID";
+    }
+  }
+
+  // Format timestamp from blockchain
+  const formatTimestamp = (timestamp: bigint): string => {
+    try {
+      return new Date(Number(timestamp) * 1000).toISOString().split('T')[0];
+    } catch (error) {
+      console.error("Error formatting timestamp:", error);
+      return new Date().toISOString().split('T')[0];
+    }
+  }
+
+  // Transform blockchain data to our interface
+  const records: TransplantRecord[] = transplantRecords ? 
+    (transplantRecords as any[]).map((record, index) => ({
+      id: index.toString(),
+      donor: {
+        id: formatId(record.donorId, "D"),
+        name: record.donorName,
+      },
+      recipient: {
+        id: formatId(record.recipientId, "R"),
+        name: record.recipientName,
+      },
+      organ: record.organ,
+      transplantDate: formatTimestamp(record.transplantTimestamp),
+      confirmationDate: formatTimestamp(record.confirmationTimestamp),
+      notes: record.notes
+    })) : []
 
   // Generate array of years from 2020 to current year
   const years = Array.from(
@@ -125,7 +160,7 @@ export default function TransplantRecords() {
     }
   };
 
-  const filteredRecords = sampleRecords.filter((record) => {
+  const filteredRecords = records.filter((record) => {
     // Apply search filter
     let matchesSearch = true;
     if (searchTerm) {
@@ -159,7 +194,7 @@ export default function TransplantRecords() {
       // If month is also selected, check if month matches too
       if (yearMatches && selectedMonth && selectedMonth !== "all") {
         const recordMonth = record.transplantDate.split("-")[1];
-        return recordMonth === selectedMonth; // If month selected, both year and month must match
+        return recordMonth === selectedMonth;
       }
       
       matchesFilter = yearMatches;
@@ -236,6 +271,21 @@ export default function TransplantRecords() {
     }
   };
 
+  if (isPending) {
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle>Transplant Records</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center h-40">
+            <p>Loading transplant records from blockchain...</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -299,6 +349,8 @@ export default function TransplantRecords() {
                 <TableHead>Recipient Name</TableHead>
                 <TableHead>Organ</TableHead>
                 <TableHead>Transplant Date</TableHead>
+                <TableHead>Confirmation Date</TableHead>
+                <TableHead>Notes</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -308,13 +360,21 @@ export default function TransplantRecords() {
                   <TableCell>{record.donor.name}</TableCell>
                   <TableCell>{record.recipient.id}</TableCell>
                   <TableCell>{record.recipient.name}</TableCell>
-                  <TableCell>{record.organ}</TableCell>
+                  <TableCell>
+                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      {record.organ}
+                    </span>
+                  </TableCell>
                   <TableCell>{record.transplantDate}</TableCell>
+                  <TableCell>{record.confirmationDate}</TableCell>
+                  <TableCell className="max-w-[200px] truncate" title={record.notes}>
+                    {record.notes}
+                  </TableCell>
                 </TableRow>
               ))}
               {filteredRecords.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center">
+                  <TableCell colSpan={8} className="h-24 text-center">
                     No records found.
                   </TableCell>
                 </TableRow>

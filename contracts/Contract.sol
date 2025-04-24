@@ -264,7 +264,7 @@ contract OrganTransplant is Ownable {
         }
     }
 
-    // 2. Rest of the logic (find/remove from `transplants`, push to `confirmedTransplants`)
+    // 2. Rest of the logic (find/remove from transplants, push to confirmedTransplants)
     bool transplantFound = false;
     uint256 transplantTimestamp;
     uint256 indexToRemove;

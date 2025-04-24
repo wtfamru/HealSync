@@ -1,5 +1,6 @@
+"use client"
+
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import {
@@ -18,75 +19,82 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Search } from "lucide-react"
+import { client } from "@/providers/thirdweb-provider"
+import { getContract } from "thirdweb"
+import { sepolia } from "thirdweb/chains"
+import { useReadContract } from "thirdweb/react"
 
 const bloodGroups = ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"]
 const organs = ["Heart", "Lung", "Liver", "Kidney", "Pancreas", "Eyes"]
 
-// Sample data - replace with actual data from your backend
-const sampleDonors = [
-  {
-    id: 1,
-    name: "John Doe",
-    age: 32,
-    bloodGroup: "A+",
-    organ: "Kidney",
-    tissueType: "A1",
-    hlaMatch: "B8",
-    status: "Available",
-  },
-  {
-    id: 2,
-    name: "Jane Smith",
-    age: 28,
-    bloodGroup: "O-",
-    organ: "Liver",
-    tissueType: "A2",
-    hlaMatch: "B7",
-    status: "Available",
-  },
-  {
-    id: 3,
-    name: "Michael Johnson",
-    age: 45,
-    bloodGroup: "B+",
-    organ: "Heart",
-    tissueType: "A3",
-    hlaMatch: "B5",
-    status: "Available",
-  },
-  {
-    id: 4,
-    name: "Sarah Wilson",
-    age: 35,
-    bloodGroup: "AB+",
-    organ: "Lung",
-    tissueType: "A1",
-    hlaMatch: "B9",
-    status: "Available",
-  },
-  {
-    id: 5,
-    name: "Robert Brown",
-    age: 41,
-    bloodGroup: "A-",
-    organ: "Pancreas",
-    tissueType: "A2",
-    hlaMatch: "B4",
-    status: "Available",
-  }
-]
+interface Donor {
+  id: string;
+  name: string;
+  gender: string;
+  age: string;
+  medical: {
+    bloodGroup: string;
+    organ: string;
+    tissueType: string;
+    hlaMatch: string;
+  };
+  isAvailable: boolean;
+}
 
 export default function ViewDonors() {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedBloodGroup, setSelectedBloodGroup] = useState("all")
   const [selectedOrgan, setSelectedOrgan] = useState("all")
 
-  const filteredDonors = sampleDonors.filter((donor) => {
+  const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "0x7cfb5aee97b742d10739780336054422c60626e7";
+
+  const contract = getContract({
+    client,
+    chain: sepolia,
+    address: CONTRACT_ADDRESS,
+  })
+
+  const { data: donors, isPending } = useReadContract({
+    contract,
+    method: "function getAllDonors() view returns ((uint256 id, string name, string gender, uint256 age, (string bloodGroup, string organ, string tissueType, uint256 hlaMatch) medical, bool isAvailable)[])",
+    params: [],
+  })
+
+  const donorsList: Donor[] = donors ? donors.map((donor: any) => ({
+    id: donor.id.toString(),
+    name: donor.name,
+    gender: donor.gender,
+    age: donor.age.toString(),
+    medical: {
+      bloodGroup: donor.medical.bloodGroup,
+      organ: donor.medical.organ,
+      tissueType: donor.medical.tissueType,
+      hlaMatch: donor.medical.hlaMatch.toString(),
+    },
+    isAvailable: donor.isAvailable,
+  })) : []
+
+  const filteredDonors = donorsList.filter((donor) => {
     const matchesSearch = donor.name.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesBloodGroup = selectedBloodGroup === "all" || donor.bloodGroup === selectedBloodGroup
-    const matchesOrgan = selectedOrgan === "all" || donor.organ === selectedOrgan
+    const matchesBloodGroup = selectedBloodGroup === "all" || donor.medical.bloodGroup === selectedBloodGroup
+    const matchesOrgan = selectedOrgan === "all" || donor.medical.organ === selectedOrgan
     return matchesSearch && matchesBloodGroup && matchesOrgan
   })
+
+  if (isPending) {
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle>Available Donors</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center h-40">
+            <p>Loading donors from blockchain...</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <Card className="w-full">
@@ -138,11 +146,12 @@ export default function ViewDonors() {
               <TableRow>
                 <TableHead className="font-semibold">Name</TableHead>
                 <TableHead className="font-semibold">Age</TableHead>
+                <TableHead className="font-semibold">Gender</TableHead>
                 <TableHead className="font-semibold">Blood Group</TableHead>
                 <TableHead className="font-semibold">Organ</TableHead>
                 <TableHead className="font-semibold">Tissue Type</TableHead>
                 <TableHead className="font-semibold">HLA Match</TableHead>
-                <TableHead className="font-semibold">Actions</TableHead>
+                <TableHead className="font-semibold">Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -150,14 +159,19 @@ export default function ViewDonors() {
                 <TableRow key={donor.id} className="hover:bg-gray-50">
                   <TableCell className="font-medium">{donor.name}</TableCell>
                   <TableCell>{donor.age}</TableCell>
-                  <TableCell>{donor.bloodGroup}</TableCell>
-                  <TableCell>{donor.organ}</TableCell>
-                  <TableCell>{donor.tissueType}</TableCell>
-                  <TableCell>{donor.hlaMatch}</TableCell>
+                  <TableCell>{donor.gender}</TableCell>
+                  <TableCell>{donor.medical.bloodGroup}</TableCell>
+                  <TableCell>{donor.medical.organ}</TableCell>
+                  <TableCell>{donor.medical.tissueType}</TableCell>
+                  <TableCell>{donor.medical.hlaMatch}</TableCell>
                   <TableCell>
-                    <Button variant="outline" size="sm">
-                      View Details
-                    </Button>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      donor.isAvailable 
+                        ? "bg-green-100 text-green-800" 
+                        : "bg-red-100 text-red-800"
+                    }`}>
+                      {donor.isAvailable ? "Available" : "Unavailable"}
+                    </span>
                   </TableCell>
                 </TableRow>
               ))}
