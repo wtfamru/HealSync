@@ -1,4 +1,6 @@
-import { useState } from "react"
+"use client"
+
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -18,80 +20,105 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Search } from "lucide-react"
+import { client } from "@/providers/thirdweb-provider"
+import { getContract, type SmartContract } from "thirdweb"
+import { sepolia } from "thirdweb/chains"
+import { useActiveAccount } from "thirdweb/react"
+import { toast } from "sonner"
 
 const bloodGroups = ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"]
 const organs = ["Heart", "Lung", "Liver", "Kidney", "Pancreas", "Eyes"]
 const urgencyLevels = ["Low", "Medium", "High", "Critical"]
 
-// Sample data - replace with actual data from your backend
-const samplePatients = [
-  {
-    id: 1,
-    name: "Robert Johnson",
-    age: 45,
-    bloodGroup: "A+",
-    organ: "Kidney",
-    tissueType: "A1",
-    hlaMatch: "B8",
-    urgency: "High",
-    status: "Waiting",
-  },
-  {
-    id: 2,
-    name: "Sarah Williams",
-    age: 38,
-    bloodGroup: "O-",
-    organ: "Liver",
-    tissueType: "A2",
-    hlaMatch: "B7",
-    urgency: "Critical",
-    status: "Waiting",
-  },
-  {
-    id: 3,
-    name: "Emily Davis",
-    age: 29,
-    bloodGroup: "B+",
-    organ: "Heart",
-    tissueType: "A3",
-    hlaMatch: "B5",
-    urgency: "Medium",
-    status: "Waiting",
-  },
-  {
-    id: 4,
-    name: "James Wilson",
-    age: 52,
-    bloodGroup: "AB+",
-    organ: "Lung",
-    tissueType: "A1",
-    hlaMatch: "B9",
-    urgency: "Critical",
-    status: "Waiting",
-  },
-  {
-    id: 5,
-    name: "Maria Garcia",
-    age: 33,
-    bloodGroup: "A-",
-    organ: "Pancreas",
-    tissueType: "A2",
-    hlaMatch: "B4",
-    urgency: "Low",
-    status: "Waiting",
-  }
-]
+interface Patient {
+  id: string;
+  name: string;
+  gender: string;
+  age: string;
+  medical: {
+    bloodGroup: string;
+    organ: string;
+    tissueType: string;
+    hlaMatch: string;
+  };
+  urgency: string;
+  isWaiting: boolean;
+  waitingTime: string;
+}
 
 export default function ViewPatients() {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedBloodGroup, setSelectedBloodGroup] = useState("all")
   const [selectedOrgan, setSelectedOrgan] = useState("all")
   const [selectedUrgency, setSelectedUrgency] = useState("all")
+  const [patients, setPatients] = useState<Patient[]>([])
+  const [loading, setLoading] = useState(true)
+  const account = useActiveAccount()
 
-  const filteredPatients = samplePatients.filter((patient) => {
+  const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "0x7cfb5aee97b742d10739780336054422c60626e7";
+
+  useEffect(() => {
+    if (account) {
+      fetchPatients()
+    }
+  }, [account])
+
+  const fetchPatients = async () => {
+    if (!account) {
+      toast.error("Please connect your wallet first")
+      return
+    }
+
+    try {
+      setLoading(true)
+      const contract = getContract({
+        client,
+        chain: sepolia,
+        address: CONTRACT_ADDRESS,
+      }) as SmartContract
+
+      // Get the recipient counter to know how many patients to fetch
+      const totalRecipients = await contract.read.recipientCounter()
+
+      const patientsList: Patient[] = []
+
+      // Fetch each recipient's data
+      for (let i = 1; i <= Number(totalRecipients); i++) {
+        const recipient = await contract.read.recipients([i])
+        
+        // Only add patients who are still waiting
+        if (recipient.isWaiting) {
+          patientsList.push({
+            id: recipient.id.toString(),
+            name: recipient.name,
+            gender: recipient.gender,
+            age: recipient.age.toString(),
+            medical: {
+              bloodGroup: recipient.medical.bloodGroup,
+              organ: recipient.medical.organ,
+              tissueType: recipient.medical.tissueType,
+              hlaMatch: recipient.medical.hlaMatch.toString(),
+            },
+            urgency: recipient.urgency,
+            isWaiting: recipient.isWaiting,
+            waitingTime: new Date(Number(recipient.waitingTime) * 1000).toISOString(),
+          })
+        }
+      }
+
+      setPatients(patientsList)
+    } catch (error) {
+      console.error("Error fetching patients:", error)
+      toast.error("Failed to load patients from blockchain")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const filteredPatients = patients.filter((patient) => {
     const matchesSearch = patient.name.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesBloodGroup = selectedBloodGroup === "all" || patient.bloodGroup === selectedBloodGroup
-    const matchesOrgan = selectedOrgan === "all" || patient.organ === selectedOrgan
+    const matchesBloodGroup = selectedBloodGroup === "all" || patient.medical.bloodGroup === selectedBloodGroup
+    const matchesOrgan = selectedOrgan === "all" || patient.medical.organ === selectedOrgan
     const matchesUrgency = selectedUrgency === "all" || patient.urgency === selectedUrgency
     return matchesSearch && matchesBloodGroup && matchesOrgan && matchesUrgency
   })
@@ -109,6 +136,21 @@ export default function ViewPatients() {
       default:
         return "bg-gray-100 text-gray-800"
     }
+  }
+
+  if (loading) {
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle>Waiting Patients</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center h-40">
+            <p>Loading patients from blockchain...</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
   }
 
   return (
@@ -179,6 +221,7 @@ export default function ViewPatients() {
                 <TableHead className="font-semibold">Tissue Type</TableHead>
                 <TableHead className="font-semibold">HLA Match</TableHead>
                 <TableHead className="font-semibold">Urgency</TableHead>
+                <TableHead className="font-semibold">Waiting Since</TableHead>
                 <TableHead className="font-semibold">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -187,14 +230,17 @@ export default function ViewPatients() {
                 <TableRow key={patient.id} className="hover:bg-gray-50">
                   <TableCell className="font-medium">{patient.name}</TableCell>
                   <TableCell>{patient.age}</TableCell>
-                  <TableCell>{patient.bloodGroup}</TableCell>
-                  <TableCell>{patient.organ}</TableCell>
-                  <TableCell>{patient.tissueType}</TableCell>
-                  <TableCell>{patient.hlaMatch}</TableCell>
+                  <TableCell>{patient.medical.bloodGroup}</TableCell>
+                  <TableCell>{patient.medical.organ}</TableCell>
+                  <TableCell>{patient.medical.tissueType}</TableCell>
+                  <TableCell>{patient.medical.hlaMatch}</TableCell>
                   <TableCell>
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${getUrgencyColor(patient.urgency)}`}>
                       {patient.urgency}
                     </span>
+                  </TableCell>
+                  <TableCell>
+                    {new Date(patient.waitingTime).toLocaleDateString()}
                   </TableCell>
                   <TableCell>
                     <Button variant="outline" size="sm">

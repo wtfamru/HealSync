@@ -114,15 +114,14 @@ export default function RegisterPatient() {
         BigInt(formData.age),
         formData.bloodGroup,
         formData.organ,
-        "", // Empty string for IPFS hash
-        urgencyPriorityMap[formData.urgency],
-        formData.tissueType, // Pass tissue type as string
-        BigInt(formData.hlaMatch),
+        formData.urgency,
+        formData.tissueType,
+        BigInt(formData.hlaMatch)
       ] as const;
 
       const tx = prepareContractCall({
         contract: contract,
-        method: "function registerRecipient(string _name, string _gender, uint256 _age, string _bloodGroup, string _organ, string _ipfsHash, uint256 _priority, string _tissueType, uint256 _hlaMatch)",
+        method: "function registerRecipient(string _name, string _gender, uint256 _age, string _bloodGroup, string _organ, string _urgency, string _tissueType, uint256 _hlaMatch)",
         params: patientArgs,
       })
 
