@@ -188,27 +188,27 @@ export default function OrganDonationLanding() {
               {[
                 {
                   name: "Sarah Johnson",
-                  role: "Kidney Recipient",
+                  role: "Recipient's Sister",
                   quote:
-                    "Receiving a kidney transplant gave me a second chance at life. I'm forever grateful to my donor for their selfless gift.",
-                  image: "/placeholder.svg?height=80&width=80",
+                    "HealSync's matching system helped my brother receive a life-saving transplant. The transparency and security of the process gave our family peace of mind during a difficult time.",
+                  image: "/testimonials/1.jpg",
                 },
                 {
-                  name: "Michael Chen",
-                  role: "Donor Family Member",
+                  name: "Dr. Michael Chen",
+                  role: "Transplant Specialist",
                   quote:
-                    "After losing my brother, knowing his organs helped save four lives brings us comfort and meaning to our loss.",
-                  image: "/placeholder.svg?height=80&width=80",
+                    "Blockchain technology in organ donation helps eliminate black market risks and ensures ethical practices. HealSync's system is a major advancement for patient safety and donor verification.",
+                  image: "/testimonials/2.jpg",
                 },
               ].map((testimonial, index) => (
                 <Card key={index} className="p-6 shadow-md">
                   <div className="flex flex-col items-center gap-4 text-center md:flex-row md:text-left">
                     <Image
-                      src={testimonial.image || "/placeholder.svg"}
+                      src={testimonial.image}
                       alt={testimonial.name}
                       width={80}
                       height={80}
-                      className="rounded-full"
+                      className="rounded-full object-cover"
                     />
                     <div>
                       <blockquote className="mb-4 italic text-gray-600">"{testimonial.quote}"</blockquote>

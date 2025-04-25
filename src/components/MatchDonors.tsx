@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Search, AlertCircle } from "lucide-react"
+import { Search, AlertCircle, Calendar } from "lucide-react"
 import { toast } from "sonner"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
@@ -37,6 +37,8 @@ import { getContract, prepareContractCall } from "thirdweb"
 import { sepolia } from "thirdweb/chains"
 import { useReadContract, useSendTransaction, useActiveAccount } from "thirdweb/react"
 
+const organs = ["Heart", "Lung", "Liver", "Kidney", "Pancreas", "Eyes"]
+
 interface MatchResult {
   success: boolean;
   donorId: string;
@@ -53,6 +55,9 @@ interface Transplant {
   recipientName: string;
 }
 
+type FilterType = "none" | "organ" | "date" | "year";
+type SearchByType = "donorName" | "donorId" | "recipientName" | "recipientId";
+
 export default function MatchDonors() {
   const [searchTerm, setSearchTerm] = useState("")
   const [commitDialogOpen, setCommitDialogOpen] = useState(false)
@@ -61,6 +66,15 @@ export default function MatchDonors() {
   const [isMatchLoading, setIsMatchLoading] = useState(false)
   const account = useActiveAccount()
   const { mutate: sendTransaction } = useSendTransaction()
+  
+  // New state for advanced search and filters
+  const [filterType, setFilterType] = useState<FilterType>("none")
+  const [searchBy, setSearchBy] = useState<SearchByType>("donorName")
+  const [selectedOrgan, setSelectedOrgan] = useState("")
+  const [selectedDate, setSelectedDate] = useState("")
+  const [selectedYear, setSelectedYear] = useState("")
+  const [selectedMonth, setSelectedMonth] = useState("")
+  const [showMonthFilter, setShowMonthFilter] = useState(false)
 
   const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "0x7cfb5aee97b742d10739780336054422c60626e7";
 
@@ -105,21 +119,195 @@ export default function MatchDonors() {
     }
   }
 
-  const filteredTransplants = transplantRecords ? 
+  // Format date for filtering (YYYY-MM-DD)
+  const formatDateForFilter = (timestamp: bigint): string => {
+    try {
+      return new Date(Number(timestamp) * 1000).toISOString().split('T')[0];
+    } catch (error) {
+      console.error("Error formatting timestamp for filter:", error);
+      return new Date().toISOString().split('T')[0];
+    }
+  }
+
+  // Transform blockchain data for our component
+  const transformedTransplants = transplantRecords ? 
     (transplantRecords as any[]).map(record => ({
       donorId: formatId(record.donorId, "D"),
       donorName: record.donorName,
       recipientId: formatId(record.recipientId, "R"),
       recipientName: record.recipientName,
       organ: record.organ,
-      timestamp: formatTimestamp(record.timestamp)
-    })).filter(transplant =>
-      transplant.donorId.includes(searchTerm) ||
-      transplant.donorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transplant.recipientId.includes(searchTerm) ||
-      transplant.recipientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transplant.organ.toLowerCase().includes(searchTerm.toLowerCase())
-    ).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()) : []
+      timestamp: formatTimestamp(record.timestamp),
+      dateForFilter: formatDateForFilter(record.timestamp)
+    })) : []
+
+  // Generate array of years from 2020 to current year
+  const years = Array.from(
+    { length: new Date().getFullYear() - 2019 },
+    (_, i) => (2020 + i).toString()
+  );
+
+  // Array of months
+  const months = [
+    { value: "01", label: "January" },
+    { value: "02", label: "February" },
+    { value: "03", label: "March" },
+    { value: "04", label: "April" },
+    { value: "05", label: "May" },
+    { value: "06", label: "June" },
+    { value: "07", label: "July" },
+    { value: "08", label: "August" },
+    { value: "09", label: "September" },
+    { value: "10", label: "October" },
+    { value: "11", label: "November" },
+    { value: "12", label: "December" },
+  ];
+
+  // When year changes, reset month filter and show month filter options
+  const handleYearChange = (year: string) => {
+    setSelectedYear(year);
+    setSelectedMonth("");
+    setShowMonthFilter(true);
+  };
+
+  // When filter type changes, reset appropriate states
+  const handleFilterTypeChange = (type: FilterType) => {
+    setFilterType(type);
+    if (type !== "year") {
+      setShowMonthFilter(false);
+      setSelectedMonth("");
+    }
+  };
+
+  const getSearchPlaceholder = () => {
+    switch (searchBy) {
+      case "donorName":
+        return "Search by donor name...";
+      case "donorId":
+        return "Search by donor ID...";
+      case "recipientName":
+        return "Search by recipient name...";
+      case "recipientId":
+        return "Search by recipient ID...";
+      default:
+        return "Search...";
+    }
+  };
+
+  const filteredTransplants = transformedTransplants.filter((transplant) => {
+    // Apply search filter
+    let matchesSearch = true;
+    if (searchTerm) {
+      switch (searchBy) {
+        case "donorName":
+          matchesSearch = transplant.donorName.toLowerCase().includes(searchTerm.toLowerCase());
+          break;
+        case "donorId":
+          matchesSearch = transplant.donorId.toLowerCase().includes(searchTerm.toLowerCase());
+          break;
+        case "recipientName":
+          matchesSearch = transplant.recipientName.toLowerCase().includes(searchTerm.toLowerCase());
+          break;
+        case "recipientId":
+          matchesSearch = transplant.recipientId.toLowerCase().includes(searchTerm.toLowerCase());
+          break;
+      }
+    }
+
+    // Apply additional filters
+    let matchesFilter = true;
+    if (filterType === "organ" && selectedOrgan && selectedOrgan !== "all") {
+      matchesFilter = transplant.organ === selectedOrgan;
+    } else if (filterType === "date" && selectedDate) {
+      matchesFilter = transplant.dateForFilter === selectedDate;
+    } else if (filterType === "year" && selectedYear) {
+      // Extract year from YYYY-MM-DD format
+      const recordYear = transplant.dateForFilter.split("-")[0];
+      let yearMatches = recordYear === selectedYear;
+      
+      // If month is also selected, check if month matches too
+      if (yearMatches && selectedMonth && selectedMonth !== "all") {
+        const recordMonth = transplant.dateForFilter.split("-")[1];
+        return recordMonth === selectedMonth;
+      }
+      
+      matchesFilter = yearMatches;
+    }
+
+    return matchesSearch && matchesFilter;
+  }).sort((a, b) => {
+    // Sort by timestamp (newest first)
+    return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+  });
+
+  // Get the appropriate filter control based on filter type
+  const getFilterControl = () => {
+    switch (filterType) {
+      case "organ":
+        return (
+          <Select value={selectedOrgan} onValueChange={setSelectedOrgan}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Select organ" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Organs</SelectItem>
+              {organs.map((organ) => (
+                <SelectItem key={organ} value={organ}>
+                  {organ}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        );
+      case "date":
+        return (
+          <div className="relative w-[180px]">
+            <Calendar className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
+            <Input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="pl-8"
+            />
+          </div>
+        );
+      case "year":
+        return (
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Select value={selectedYear} onValueChange={handleYearChange}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Select year" />
+              </SelectTrigger>
+              <SelectContent>
+                {years.map((year) => (
+                  <SelectItem key={year} value={year}>
+                    {year}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            
+            {showMonthFilter && (
+              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="All months" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All months</SelectItem>
+                  {months.map((month) => (
+                    <SelectItem key={month.value} value={month.value}>
+                      {month.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
 
   // Handle match recipient
   const handleMatchRecipient = async () => {
@@ -223,16 +411,51 @@ export default function MatchDonors() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col md:flex-row gap-4 mb-6">
+            <div className="flex flex-col md:flex-row gap-4 w-full">
+              {/* Search By Selector */}
+              <Select value={searchBy} onValueChange={(value) => setSearchBy(value as SearchByType)}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Search by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="donorName">Donor Name</SelectItem>
+                  <SelectItem value="donorId">Donor ID</SelectItem>
+                  <SelectItem value="recipientName">Recipient Name</SelectItem>
+                  <SelectItem value="recipientId">Recipient ID</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Search Input */}
               <div className="relative flex-1">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
                 <Input
-                placeholder="Search by donor or recipient ID..."
+                  placeholder={getSearchPlaceholder()}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-8"
                 />
               </div>
-        </div>
+
+              {/* Filter Type Selector */}
+              <Select 
+                value={filterType} 
+                onValueChange={(value) => handleFilterTypeChange(value as FilterType)}
+              >
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filter by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No Filter</SelectItem>
+                  <SelectItem value="organ">Filter by Organ</SelectItem>
+                  <SelectItem value="date">Filter by Date</SelectItem>
+                  <SelectItem value="year">Filter by Year</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Conditional Filter Control */}
+              {getFilterControl()}
+            </div>
+          </div>
 
         <div className="rounded-md border w-full overflow-x-auto">
           <Table>

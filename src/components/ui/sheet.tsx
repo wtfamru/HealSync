@@ -18,7 +18,7 @@ const Sheet = React.forwardRef<HTMLDivElement, SheetProps>(
   ({ open, onOpenChange, children }, ref) => {
     if (!open) return null
 
-    return (
+  return (
       <div ref={ref} className="fixed inset-0 z-50">
         <div 
           className="fixed inset-0 bg-background/80 backdrop-blur-sm" 
@@ -26,8 +26,8 @@ const Sheet = React.forwardRef<HTMLDivElement, SheetProps>(
         />
         {children}
       </div>
-    )
-  }
+  )
+}
 )
 Sheet.displayName = "Sheet"
 
@@ -40,7 +40,7 @@ const SheetContent = React.forwardRef<HTMLDivElement, SheetContentProps>(
       return () => clearTimeout(timer)
     }, [])
 
-    return (
+  return (
       <div
         ref={ref}
         className={cn(
@@ -96,11 +96,11 @@ const SheetHeader = ({
   className,
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div
+    <div
     className={cn("flex flex-col space-y-2 text-center sm:text-left", className)}
-    {...props}
-  />
-)
+      {...props}
+    />
+  )
 SheetHeader.displayName = "SheetHeader"
 
 const SheetTitle = ({
@@ -109,9 +109,9 @@ const SheetTitle = ({
 }: React.HTMLAttributes<HTMLHeadingElement>) => (
   <h3
     className={cn("text-lg font-semibold text-foreground", className)}
-    {...props}
-  />
-)
+      {...props}
+    />
+  )
 SheetTitle.displayName = "SheetTitle"
 
 const SheetDescription = ({
@@ -120,9 +120,9 @@ const SheetDescription = ({
 }: React.HTMLAttributes<HTMLParagraphElement>) => (
   <p
     className={cn("text-sm text-muted-foreground", className)}
-    {...props}
-  />
-)
+      {...props}
+    />
+  )
 SheetDescription.displayName = "SheetDescription"
 
 export {

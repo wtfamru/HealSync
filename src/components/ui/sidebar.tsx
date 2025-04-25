@@ -232,7 +232,7 @@ function Sidebar({
       <MobileSidebar
         open={openMobile}
         onOpenChange={setOpenMobile}
-        side={side}
+          side={side}
         className={cn(
           "bg-sidebar text-sidebar-foreground w-(--sidebar-width) p-0",
           className

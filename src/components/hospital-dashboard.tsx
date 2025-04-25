@@ -141,6 +141,11 @@ export default function Dashboard() {
   const [registeredDonors, setRegisteredDonors] = useState<RegisteredDonor[]>([])
   const [open, setOpen] = useState(false)
   const [viewPledge, setViewPledge] = useState<Donor | null>(null)
+  const [verifyingDonorId, setVerifyingDonorId] = useState<string | null>(null)
+  const [pendingFirebaseDeletion, setPendingFirebaseDeletion] = useState<{
+    id: string;
+    donorName: string;
+  } | null>(null)
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -460,16 +465,32 @@ export default function Dashboard() {
   }
 
   const handleVerifyDonor = async (registeredId: string) => {
+    // Stop if already processing
+    if (verifyingDonorId) {
+      return;
+    }
+
+    // Clear any stuck toasts
+    toast.dismiss();
+    
     try {
-      // Get the donor data before deleting
-      const donorToVerify = registeredDonors.find(donor => donor.id === registeredId);
+      // Set state to show loading
+      setVerifyingDonorId(registeredId);
       
+      // Find donor data
+      const donorToVerify = registeredDonors.find(donor => donor.id === registeredId);
       if (!donorToVerify) {
         toast.error("Donor record not found");
+        setVerifyingDonorId(null);
         return;
       }
 
-      // Prepare the blockchain transaction
+      console.log("[VERIFY] Starting blockchain registration for donor:", donorToVerify.donorName);
+      
+      // Show toast for wallet confirmation
+      toast.loading("Please confirm in your wallet to register donor on blockchain...");
+      
+      // Prepare blockchain call
       const tx = prepareContractCall({
         contract,
         method: "function registerDonor(string _name, string _gender, uint256 _age, string _bloodGroup, string _organ, string _tissueType, uint256 _hlaMatch)",
@@ -484,21 +505,68 @@ export default function Dashboard() {
         ],
       });
 
-      // Send the transaction and wait for it to complete
-      await sendTransaction(tx);
-
-      // Only delete from Firebase after successful blockchain transaction
+      console.log("[VERIFY] Transaction prepared, awaiting wallet interaction");
+      
+      // Important: Use the mutate function which is renamed to sendTransaction
+      // and wrap it in a Promise to ensure we can properly await it
+      await new Promise((resolve, reject) => {
+        sendTransaction(tx, {
+          onSuccess: (result) => {
+            console.log("[VERIFY] Transaction successful:", result);
+            
+            // Set the pending deletion state that will trigger the confirmation dialog
+            setPendingFirebaseDeletion({
+              id: registeredId,
+              donorName: donorToVerify.donorName
+            });
+            
+            // Dismiss loading toast and show waiting toast
+            toast.dismiss();
+            toast.loading("Transaction submitted to blockchain. Waiting for confirmation...");
+            
+            resolve(result);
+          },
+          onError: (error) => {
+            console.error("[VERIFY] Transaction error:", error);
+            toast.dismiss();
+            toast.error("Transaction failed or was rejected");
+            reject(error);
+          }
+        });
+      });
+    } catch (error) {
+      console.error("[VERIFY] Error during verification:", error);
+      toast.dismiss();
+      toast.error("Error during blockchain registration. Please try again.");
+    } finally {
+      setVerifyingDonorId(null);
+    }
+  };
+  
+  // New function to handle Firebase deletion after blockchain confirmation
+  const confirmFirebaseDeletion = async () => {
+    if (!pendingFirebaseDeletion) return;
+    
+    try {
+      toast.loading("Finalizing registration...");
+      
+      const registeredId = pendingFirebaseDeletion.id;
+      
+      // Delete from Firebase
       const registeredRef = doc(db, "hospitals", user?.uid || "", "registered_donors", registeredId);
       await deleteDoc(registeredRef);
       
-      // Remove the donor from the local state
+      // Update local state
       setRegisteredDonors(prev => prev.filter(d => d.id !== registeredId));
       
-      toast.success("Donor verified and registered on blockchain!");
-    } catch (error: any) {
-      console.error("Error verifying donor:", error);
-      const message = error.reason || error.message || "An unknown error occurred during verification.";
-      toast.error(`Verification failed: ${message}`);
+      toast.dismiss();
+      toast.success("Donor successfully verified and registered on blockchain!");
+    } catch (error) {
+      console.error("[VERIFY] Firebase deletion error:", error);
+      toast.dismiss();
+      toast.error("Error updating database. The donor was registered on blockchain but database update failed.");
+    } finally {
+      setPendingFirebaseDeletion(null);
     }
   };
 
@@ -997,7 +1065,7 @@ export default function Dashboard() {
         )
       case "verify-donor":
         return (
-          <Card>
+          <Card className="w-full max-w-[1200px] mx-auto">
             <CardHeader>
               <CardTitle>Verify Registered Donors</CardTitle>
               <CardDescription>List of donors who have registered their organs</CardDescription>
@@ -1007,11 +1075,11 @@ export default function Dashboard() {
                 {registeredDonors.map((registered) => (
                   <Card key={registered.id} className="p-4">
                     <div className="flex justify-between items-center">
-                      <div className="space-y-2">
+                      <div className="space-y-2 w-full">
                         <div className="flex items-center gap-2">
                           <h3 className="font-medium">{registered.donorName}</h3>
                         </div>
-                        <div className="text-sm text-gray-500 space-y-1">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-500">
                           <p>Organ: {registered.organ}</p>
                           <p>Blood Group: {registered.bloodGroup}</p>
                           <p>Age: {registered.age}</p>
@@ -1025,9 +1093,20 @@ export default function Dashboard() {
                             variant="default"
                             size="sm"
                             onClick={() => handleVerifyDonor(registered.id)}
+                            disabled={verifyingDonorId === registered.id}
                             className="cursor-pointer"
                           >
-                            Verify Donor
+                            {verifyingDonorId === registered.id ? (
+                              <>
+                                <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Processing...
+                              </>
+                            ) : (
+                              "Verify Donor"
+                            )}
                           </Button>
                         </div>
                       </div>
@@ -1071,6 +1150,29 @@ export default function Dashboard() {
             </Button>
             <Button variant="default" onClick={handleMarkDeceased} className="cursor-pointer">
               Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* New dialog for blockchain confirmation */}
+      <Dialog open={!!pendingFirebaseDeletion} onOpenChange={(open) => {
+        if (!open) setPendingFirebaseDeletion(null);
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Blockchain Registration Complete</DialogTitle>
+            <DialogDescription>
+              The donor <strong>{pendingFirebaseDeletion?.donorName}</strong> has been successfully registered on the blockchain. 
+              Click "Complete Registration" to remove this donor from your database.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPendingFirebaseDeletion(null)} className="cursor-pointer">
+              Cancel
+            </Button>
+            <Button variant="default" onClick={confirmFirebaseDeletion} className="cursor-pointer">
+              Complete Registration
             </Button>
           </DialogFooter>
         </DialogContent>

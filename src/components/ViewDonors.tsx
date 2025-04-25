@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import {
@@ -18,11 +18,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Search } from "lucide-react"
+import { Search, RefreshCcw } from "lucide-react"
 import { client } from "@/providers/thirdweb-provider"
 import { getContract } from "thirdweb"
 import { sepolia } from "thirdweb/chains"
 import { useReadContract } from "thirdweb/react"
+import { Button } from "@/components/ui/button"
+import { toast } from "sonner"
 
 const bloodGroups = ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"]
 const organs = ["Heart", "Lung", "Liver", "Kidney", "Pancreas", "Eyes"]
@@ -45,6 +47,8 @@ export default function ViewDonors() {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedBloodGroup, setSelectedBloodGroup] = useState("all")
   const [selectedOrgan, setSelectedOrgan] = useState("all")
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [lastRefreshed, setLastRefreshed] = useState(new Date())
 
   const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "0x7cfb5aee97b742d10739780336054422c60626e7";
 
@@ -54,11 +58,47 @@ export default function ViewDonors() {
     address: CONTRACT_ADDRESS,
   })
 
-  const { data: donors, isPending } = useReadContract({
+  const { data: donors, isPending, refetch } = useReadContract({
     contract,
     method: "function getAllDonors() view returns ((uint256 id, string name, string gender, uint256 age, (string bloodGroup, string organ, string tissueType, uint256 hlaMatch) medical, bool isAvailable)[])",
     params: [],
   })
+
+  // Auto-refresh data every 30 seconds
+  useEffect(() => {
+    const intervalId = setInterval(async () => {
+      await handleRefresh();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(intervalId); // Clean up on unmount
+  }, []);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refetch();
+      setLastRefreshed(new Date());
+      // No toast on auto refresh to avoid spamming notifications
+    } catch (error) {
+      console.error("Failed to refresh data:", error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const manualRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refetch();
+      setLastRefreshed(new Date());
+      toast.success("Donor list data refreshed");
+    } catch (error) {
+      toast.error("Failed to refresh data");
+      console.error("Failed to refresh data:", error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const donorsList: Donor[] = donors ? donors.map((donor: any) => ({
     id: donor.id.toString(),
@@ -98,8 +138,21 @@ export default function ViewDonors() {
 
   return (
     <Card className="w-full">
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Available Donors</CardTitle>
+        <div className="flex items-center gap-2 text-sm text-gray-500">
+          <span>Last updated: {lastRefreshed.toLocaleTimeString()}</span>
+          <Button 
+            variant="outline" 
+            size="icon" 
+            onClick={manualRefresh} 
+            disabled={isRefreshing}
+            className="h-8 w-8"
+          >
+            <RefreshCcw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <span className="sr-only">Refresh</span>
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col md:flex-row gap-4 mb-6">

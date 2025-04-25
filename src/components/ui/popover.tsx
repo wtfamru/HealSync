@@ -4,6 +4,7 @@ import * as React from "react"
 import * as PopoverPrimitive from "@radix-ui/react-popover"
 
 import { cn } from "@/lib/utils"
+import { withCompatRef } from "@/lib/ref-compat"
 
 function Popover({
   ...props
@@ -17,15 +18,16 @@ function PopoverTrigger({
   return <PopoverPrimitive.Trigger data-slot="popover-trigger" {...props} />
 }
 
-function PopoverContent({
-  className,
-  align = "center",
-  sideOffset = 4,
-  ...props
-}: React.ComponentProps<typeof PopoverPrimitive.Content>) {
+// Using the compatibility wrapper for PopoverContent which likely uses refs
+const PopoverContent = withCompatRef(
+  React.forwardRef<
+    React.ElementRef<typeof PopoverPrimitive.Content>,
+    React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>
+  >(({ className, align = "center", sideOffset = 4, ...props }, ref) => {
   return (
     <PopoverPrimitive.Portal>
       <PopoverPrimitive.Content
+          ref={ref}
         data-slot="popover-content"
         align={align}
         sideOffset={sideOffset}
@@ -37,7 +39,8 @@ function PopoverContent({
       />
     </PopoverPrimitive.Portal>
   )
-}
+  })
+)
 
 function PopoverAnchor({
   ...props

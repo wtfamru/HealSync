@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Search } from "lucide-react"
+import { Search, RefreshCcw } from "lucide-react"
 import { client } from "@/providers/thirdweb-provider"
 import { getContract } from "thirdweb"
 import { sepolia } from "thirdweb/chains"
@@ -51,6 +51,8 @@ export default function ViewPatients() {
   const [selectedBloodGroup, setSelectedBloodGroup] = useState("all")
   const [selectedOrgan, setSelectedOrgan] = useState("all")
   const [selectedUrgency, setSelectedUrgency] = useState("all")
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [lastRefreshed, setLastRefreshed] = useState(new Date())
 
   const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "0x7cfb5aee97b742d10739780336054422c60626e7";
 
@@ -60,11 +62,47 @@ export default function ViewPatients() {
     address: CONTRACT_ADDRESS,
   })
 
-  const { data: recipients, isPending } = useReadContract({
+  const { data: recipients, isPending, refetch } = useReadContract({
     contract,
     method: "function getAllWaitingRecipients() view returns ((uint256 id, string name, string gender, uint256 age, (string bloodGroup, string organ, string tissueType, uint256 hlaMatch) medical, string urgency, bool isWaiting, uint256 waitingTime)[])",
     params: [],
   })
+
+  // Auto-refresh data every 30 seconds
+  useEffect(() => {
+    const intervalId = setInterval(async () => {
+      await handleRefresh();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(intervalId); // Clean up on unmount
+  }, []);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refetch();
+      setLastRefreshed(new Date());
+      // No toast on auto refresh to avoid spamming notifications
+    } catch (error) {
+      console.error("Failed to refresh data:", error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const manualRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refetch();
+      setLastRefreshed(new Date());
+      toast.success("Waiting list data refreshed");
+    } catch (error) {
+      toast.error("Failed to refresh data");
+      console.error("Failed to refresh data:", error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const patients: Patient[] = recipients ? recipients.map((recipient: any) => ({
     id: recipient.id.toString(),
@@ -122,8 +160,21 @@ export default function ViewPatients() {
 
   return (
     <Card className="w-full">
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Waiting Patients</CardTitle>
+        <div className="flex items-center gap-2 text-sm text-gray-500">
+          <span>Last updated: {lastRefreshed.toLocaleTimeString()}</span>
+          <Button 
+            variant="outline" 
+            size="icon" 
+            onClick={manualRefresh} 
+            disabled={isRefreshing}
+            className="h-8 w-8"
+          >
+            <RefreshCcw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <span className="sr-only">Refresh</span>
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col md:flex-row gap-4 mb-6">
@@ -189,7 +240,6 @@ export default function ViewPatients() {
                 <TableHead className="font-semibold">HLA Match</TableHead>
                 <TableHead className="font-semibold">Urgency</TableHead>
                 <TableHead className="font-semibold">Waiting Since</TableHead>
-                <TableHead className="font-semibold">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -208,11 +258,6 @@ export default function ViewPatients() {
                   </TableCell>
                   <TableCell>
                     {new Date(patient.waitingTime).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell>
-                    <Button variant="outline" size="sm">
-                      View Details
-                    </Button>
                   </TableCell>
                 </TableRow>
               ))}

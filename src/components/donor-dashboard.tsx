@@ -700,11 +700,11 @@ export default function DonorRegistrationForm() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
+                <FormField
+                  control={form.control}
                     name="liver"
-                    render={({ field }) => (
-                      <FormItem>
+                  render={({ field }) => (
+                    <FormItem>
                         <FormControl>
                           <Button
                             type="button"
@@ -772,9 +772,9 @@ export default function DonorRegistrationForm() {
                             Lungs
                           </Button>
                         </FormControl>
-                      </FormItem>
-                    )}
-                  />
+                    </FormItem>
+                  )}
+                />
                 </div>
               </div>
 

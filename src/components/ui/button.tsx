@@ -35,7 +35,7 @@ const buttonVariants = cva(
 interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
-  asChild?: boolean
+    asChild?: boolean
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
@@ -48,14 +48,14 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       })
     }
 
-    return (
+  return (
       <button
-        className={cn(buttonVariants({ variant, size, className }))}
+      className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
-        {...props}
-      />
-    )
-  }
+      {...props}
+    />
+  )
+}
 )
 Button.displayName = "Button"
 
