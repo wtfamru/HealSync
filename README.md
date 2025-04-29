@@ -47,12 +47,18 @@ HealSync is a hybrid platform connecting organ donors with recipients, combining
 - Status tracking (Active/Deceased/Verified)
 - Multi-step verification process
 
-### Prepared for Blockchain Integration
-- Smart contract architecture designed
-- Wallet connection UI components ready
-- ThirdWeb SDK integration prepared
-- Blockchain event listeners structured
-- Transaction handling system designed
+### Blockchain Integration (Completed)
+- Smart contract implementation with:
+  - Donor registration and management
+  - Recipient registration and waiting list
+  - Hospital verification system
+  - Organ matching algorithm
+  - Transplant confirmation system
+- Wallet connection and management
+- Gas fee estimation and transaction handling
+- Real-time blockchain event tracking
+- Transparent donation tracking
+- Secure hospital verification workflow
 
 ## 🛠️ Tech Stack
 
@@ -69,64 +75,38 @@ HealSync is a hybrid platform connecting organ donors with recipients, combining
 
 ### Blockchain Stack
 - **Blockchain**: Ethereum (Sepolia Testnet)
-- **Web3 Development**: ThirdWeb
 - **Smart Contract Language**: Solidity
+- **Web3 Development**: ThirdWeb
+- **Smart Contract Framework**: OpenZeppelin
 - **Wallet Integration**: ThirdWeb Connect
 
-## 📝Next Steps – Blockchain Integration
+## 📝 Smart Contract Features
 
-We are now transitioning into full blockchain integration using **ThirdWeb** for deployment and interaction with smart contracts. The goal is to build a seamless bridge between decentralized smart contract logic and Firebase for real-time data management.
+### Core Functionality
+- **Donor Management**
+  - On-chain donor registration
+  - Organ availability tracking
+  - Donation history maintenance
+  - Medical information storage
 
-### Smart Contract Deployment Plan
+- **Recipient Management**
+  - Patient registration system
+  - Priority-based waiting list
+  - Urgency level tracking
+  - Medical compatibility checks
 
-We will deploy and connect the following modules:
+- **Hospital Operations**
+  - Hospital verification system
+  - Admin role management
+  - Transplant confirmation workflow
+  - Record maintenance
 
-- Donor Registration Contract  
-- Patient Registration Contract  
-- Organ Matching Contract  
-- Hospital Verification Contract  
-- Transaction Management Contract
-
-### Integration Objectives
-
-- Connect donor registration with smart contracts  
-- Implement automated organ matching via on-chain logic  
-- Store hospital verification status on-chain  
-- Enable transparent donation tracking  
-- Integrate hospital verification and transplant approval workflows  
-
-### Web3 Features To Be Added
-
-- Wallet connection and management (MetaMask/WalletConnect)  
-- Gas fee estimation and transaction cost handling  
-- Transaction status tracking and user confirmations  
-- Block confirmation and finality tracking  
-- Smart contract event subscription for real-time updates  
-
----
-
-### Smart Contract Functional Goals
-
-#### Donor Management
-- Register donors on-chain  
-- Track organ availability and status (Active/Deceased)  
-- Maintain donation history per donor  
-
-#### Patient Management
-- Register patients on-chain  
-- Track organ requirements and priority  
-- Maintain and manage dynamic waiting lists  
-
-#### Hospital Operations
-- Verify hospitals on-chain  
-- Confirm matches and transplants  
-- Maintain blockchain-based transplant records  
-
-#### Matching System
-- Implement automatic organ matching algorithm  
-- Prioritize based on urgency, blood compatibility, and HLA match  
-- Ensure fair and medically compatible allocation
-
+- **Matching System**
+  - Automated organ matching algorithm
+  - Blood group compatibility checks
+  - HLA matching verification
+  - Priority-based allocation
+  - Waiting time consideration
 
 ## 🚀 Getting Started
 
@@ -178,3 +158,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [shadcn/ui](https://ui.shadcn.com/)
 - [ThirdWeb](https://thirdweb.com/)
 - [Firebase](https://firebase.google.com/)
+- [OpenZeppelin](https://openzeppelin.com/)
