@@ -159,3 +159,9 @@ This project is not yet licensed
 - [ThirdWeb](https://thirdweb.com/)
 - [Firebase](https://firebase.google.com/)
 - [OpenZeppelin](https://openzeppelin.com/)
+
+- Group Members:
+1.Kavya Amin
+2.Amruthesh Sudheer
+3.Archi Patel
+4.Vedshri Salunkhe
